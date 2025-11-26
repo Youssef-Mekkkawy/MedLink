@@ -353,11 +353,11 @@ class DoctorDashboard(ctk.CTkToplevel):
         """Display patient profile"""
         try:
             self.current_patient = patient
-
+            
             # Clear content
             for widget in self.content_frame.winfo_children():
                 widget.destroy()
-
+            
             # Create tabview
             tabview = ctk.CTkTabview(
                 self.content_frame,
@@ -368,26 +368,26 @@ class DoctorDashboard(ctk.CTkToplevel):
                 segmented_button_unselected_color=COLORS['bg_light']
             )
             tabview.pack(fill='both', expand=True)
-
+            
             # Add tabs
             tabview.add("Profile")
             tabview.add("Medical History")
             tabview.add("Lab Results")
             tabview.add("Imaging")
-
+            
             # Profile tab
             profile_scroll = ctk.CTkScrollableFrame(
                 tabview.tab("Profile"),
                 fg_color='transparent'
             )
             profile_scroll.pack(fill='both', expand=True, padx=10, pady=10)
-
+            
             patient_card = PatientCard(profile_scroll, patient)
             patient_card.pack(fill='both', expand=True)
-
-            # Medical History tab - NOW FUNCTIONAL!
+            
+            # Medical History tab
             from gui.components.history_tab import HistoryTab
-
+            
             self.history_tab = HistoryTab(
                 tabview.tab("Medical History"),
                 patient,
@@ -395,29 +395,102 @@ class DoctorDashboard(ctk.CTkToplevel):
                 self.show_add_visit_dialog
             )
             self.history_tab.pack(fill='both', expand=True, padx=10, pady=10)
-
-            # Other tabs - coming soon
-            for tab_name in ["Lab Results", "Imaging"]:
-                frame = ctk.CTkFrame(
-                    tabview.tab(tab_name),
-                    fg_color='transparent'
-                )
-                frame.pack(fill='both', expand=True, padx=20, pady=20)
-
-                label = ctk.CTkLabel(
-                    frame,
-                    text=f"{tab_name} - Coming in Phase 5",
-                    font=FONTS['heading'],
-                    text_color=COLORS['text_muted']
-                )
-                label.pack(expand=True)
-
+            
+            # Lab Results tab - NOW FUNCTIONAL!
+            from gui.components.lab_results_tab import LabResultsTab
+            
+            self.lab_tab = LabResultsTab(
+                tabview.tab("Lab Results"),
+                patient,
+                self.user_data,
+                is_doctor=True
+            )
+            self.lab_tab.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # Imaging tab - NOW FUNCTIONAL!
+            from gui.components.imaging_tab import ImagingTab
+            
+            self.imaging_tab = ImagingTab(
+                tabview.tab("Imaging"),
+                patient,
+                self.user_data,
+                is_doctor=True
+            )
+            self.imaging_tab.pack(fill='both', expand=True, padx=10, pady=10)
+        
         except Exception as e:
             print(f"Error showing patient profile: {e}")
             import traceback
             traceback.print_exc()
-            messagebox.showerror(
-                "Error", f"Could not load patient profile: {str(e)}")
+            messagebox.showerror("Error", f"Could not load patient profile: {str(e)}")
+            """Display patient profile"""
+            try:
+                self.current_patient = patient
+
+                # Clear content
+                for widget in self.content_frame.winfo_children():
+                    widget.destroy()
+
+                # Create tabview
+                tabview = ctk.CTkTabview(
+                    self.content_frame,
+                    corner_radius=RADIUS['lg'],
+                    fg_color=COLORS['bg_medium'],
+                    segmented_button_fg_color=COLORS['bg_light'],
+                    segmented_button_selected_color=COLORS['primary'],
+                    segmented_button_unselected_color=COLORS['bg_light']
+                )
+                tabview.pack(fill='both', expand=True)
+
+                # Add tabs
+                tabview.add("Profile")
+                tabview.add("Medical History")
+                tabview.add("Lab Results")
+                tabview.add("Imaging")
+
+                # Profile tab
+                profile_scroll = ctk.CTkScrollableFrame(
+                    tabview.tab("Profile"),
+                    fg_color='transparent'
+                )
+                profile_scroll.pack(fill='both', expand=True, padx=10, pady=10)
+
+                patient_card = PatientCard(profile_scroll, patient)
+                patient_card.pack(fill='both', expand=True)
+
+                # Medical History tab - NOW FUNCTIONAL!
+                from gui.components.history_tab import HistoryTab
+
+                self.history_tab = HistoryTab(
+                    tabview.tab("Medical History"),
+                    patient,
+                    self.user_data,
+                    self.show_add_visit_dialog
+                )
+                self.history_tab.pack(fill='both', expand=True, padx=10, pady=10)
+
+                # Other tabs - coming soon
+                for tab_name in ["Lab Results", "Imaging"]:
+                    frame = ctk.CTkFrame(
+                        tabview.tab(tab_name),
+                        fg_color='transparent'
+                    )
+                    frame.pack(fill='both', expand=True, padx=20, pady=20)
+
+                    label = ctk.CTkLabel(
+                        frame,
+                        text=f"{tab_name} - Coming in Phase 5",
+                        font=FONTS['heading'],
+                        text_color=COLORS['text_muted']
+                    )
+                    label.pack(expand=True)
+
+            except Exception as e:
+                print(f"Error showing patient profile: {e}")
+                import traceback
+                traceback.print_exc()
+                messagebox.showerror(
+                    "Error", f"Could not load patient profile: {str(e)}")
 
 
     def show_add_visit_dialog(self):

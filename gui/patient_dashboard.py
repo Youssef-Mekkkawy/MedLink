@@ -8,6 +8,9 @@ from gui.components.patient_profile_tab import PatientProfileTab
 from gui.components.my_history_tab import MyHistoryTab
 from gui.components.link_accounts_dialog import LinkAccountsDialog
 from core.patient_manager import patient_manager
+from gui.components.lab_results_tab import LabResultsTab
+from gui.components.imaging_tab import ImagingTab
+
 
 
 class PatientDashboard(ctk.CTkToplevel):
@@ -40,6 +43,25 @@ class PatientDashboard(ctk.CTkToplevel):
         # Create UI
         self.after(100, self.create_ui)
         self.after(200, self.center_window)
+        # Lab Results tab - NOW FUNCTIONAL!
+        
+
+        self.lab_tab = LabResultsTab(
+            self.tabview.tab("Lab Results"),
+            self.patient_data,
+            is_doctor=False
+        )
+        self.lab_tab.pack(fill='both', expand=True)
+
+        # Imaging Results tab - NOW FUNCTIONAL!
+        
+
+        self.imaging_tab = ImagingTab(
+            self.tabview.tab("Imaging Results"),
+            self.patient_data,
+            is_doctor=False
+        )
+        self.imaging_tab.pack(fill='both', expand=True)
     
     def center_window(self):
         """Center window on screen"""
