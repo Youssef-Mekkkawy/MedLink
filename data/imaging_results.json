@@ -1,1 +1,17 @@
-{}
+{
+  "imaging_id": "IMG001",
+  "patient_national_id": "29501012345678",
+  "date": "2024-11-12",
+  "imaging_center": "Scan Center",
+  "imaging_type": "X-Ray|CT|MRI|Ultrasound",
+  "body_part": "Chest",
+  
+  "findings": "Normal chest x-ray",
+  "radiologist": "Dr. Salma Ibrahim",
+  
+  "external_link": "https://scancenter.eg/view/IMG001",
+  "images": [
+    "attachments/xrays/chest_xray_2024_11_12.jpg"
+  ],
+  "ordered_by": "D001"
+}
