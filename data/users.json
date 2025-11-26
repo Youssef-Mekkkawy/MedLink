@@ -1,1 +1,16 @@
-{}
+{
+	"user_id": "D001",
+	"username": "dr.ahmed",
+	"password_hash": "hashed_password",
+	"role": "doctor|patient",
+	"full_name": "Dr. Ahmed Mohamed",
+	"email": "ahmed@hospital.eg",
+	"phone": "01012345678",
+
+	"specialization": "Cardiology",
+	"hospital": "Cairo Hospital",
+	"license_number": "MED12345",
+
+  "national_id": "29501012345678",
+  "linked": true
+}

@@ -1,1 +1,28 @@
-{}
+{
+  "visit_id": "V001",
+  "patient_national_id": "29501012345678",
+  "date": "2024-11-15",
+  "time": "10:30",
+  "doctor_id": "D001",
+  "doctor_name": "Dr. Ahmed Mohamed",
+  "hospital": "Cairo Hospital",
+  "department": "Cardiology",
+  "visit_type": "Consultation|Emergency|Follow-up",
+  
+  "chief_complaint": "Chest pain",
+  "diagnosis": "Stable angina",
+  "treatment_plan": "Prescribed beta-blockers",
+  
+  "prescriptions": [
+    {
+      "medication": "Concor 5mg",
+      "dosage": "1 tablet",
+      "frequency": "Once daily",
+      "duration": "30 days"
+    }
+  ],
+  
+  "attachments": [
+    "attachments/prescriptions/prescription_V001.pdf"
+  ]
+}

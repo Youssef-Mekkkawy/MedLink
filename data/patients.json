@@ -1,1 +1,37 @@
-{}
+{
+  "national_id": "29501012345678",
+  "full_name": "Mohamed Ali Hassan",
+  "date_of_birth": "1995-01-01",
+  "age": 28,
+  "gender": "Male",
+  "blood_type": "A+",
+  "phone": "01098765432",
+  
+  "emergency_contact": {
+    "name": "Fatma Hassan",
+    "relation": "Mother",
+    "phone": "01123456789"
+  },
+  
+  "chronic_diseases": ["Asthma", "Hypertension"],
+  "allergies": ["Penicillin", "Peanuts"],
+  
+  "current_medications": [
+    {
+      "name": "Ventolin Inhaler",
+      "dosage": "2 puffs",
+      "frequency": "As needed"
+    }
+  ],
+  
+  "insurance": {
+    "provider": "Misr Insurance",
+    "policy_number": "INS123456",
+    "expiry": "2025-12-31"
+  },
+  
+  "external_links": {
+    "lab_account": "LAB789456",
+    "imaging_account": "IMG123789"
+  }
+}
