@@ -1,29 +1,26 @@
 """
-Medical history tab component
+Patient's own medical history view (read-only)
 """
 import customtkinter as ctk
-from tkinter import messagebox
 from gui.styles import *
 from gui.components.visit_card import VisitCard
 from core.visit_manager import visit_manager
 
 
-class HistoryTab(ctk.CTkFrame):
-    """Medical history timeline view"""
+class MyHistoryTab(ctk.CTkFrame):
+    """Patient's medical history view (read-only)"""
     
-    def __init__(self, parent, patient_data, doctor_data, on_add_visit):
+    def __init__(self, parent, patient_data):
         super().__init__(parent, fg_color='transparent')
         
         self.patient_data = patient_data
-        self.doctor_data = doctor_data
-        self.on_add_visit = on_add_visit
         
         self.create_ui()
         self.load_visits()
     
     def create_ui(self):
-        """Create history tab UI"""
-        # Header with actions
+        """Create history view UI"""
+        # Header
         header = ctk.CTkFrame(self, fg_color=COLORS['bg_medium'], height=80)
         header.pack(fill='x', pady=(0, 20))
         header.pack_propagate(False)
@@ -31,26 +28,22 @@ class HistoryTab(ctk.CTkFrame):
         header_content = ctk.CTkFrame(header, fg_color='transparent')
         header_content.pack(fill='both', expand=True, padx=20, pady=15)
         
-        # Title
         title_label = ctk.CTkLabel(
             header_content,
-            text="📋  Medical History",
+            text="📋  My Medical History",
             font=FONTS['heading'],
             text_color=COLORS['text_primary']
         )
         title_label.pack(side='left')
         
-        # Add visit button
-        add_btn = ctk.CTkButton(
+        # Visit count
+        self.count_label = ctk.CTkLabel(
             header_content,
-            text="➕  Add New Visit",
-            command=self.on_add_visit,
-            font=FONTS['body_bold'],
-            height=45,
-            fg_color=COLORS['secondary'],
-            hover_color='#059669'
+            text="",
+            font=FONTS['body'],
+            text_color=COLORS['text_secondary']
         )
-        add_btn.pack(side='right')
+        self.count_label.pack(side='right')
         
         # Scrollable visits container
         self.visits_scroll = ctk.CTkScrollableFrame(
@@ -69,8 +62,10 @@ class HistoryTab(ctk.CTkFrame):
         national_id = self.patient_data.get('national_id')
         visits = visit_manager.get_patient_visits(national_id)
         
+        # Update count
+        self.count_label.configure(text=f"{len(visits)} total visits")
+        
         if not visits:
-            # Show empty state
             self.show_empty_state()
             return
         
@@ -80,7 +75,7 @@ class HistoryTab(ctk.CTkFrame):
             visit_card.pack(fill='x', pady=10)
     
     def show_empty_state(self):
-        """Show empty state when no visits"""
+        """Show empty state"""
         empty_frame = ctk.CTkFrame(
             self.visits_scroll,
             fg_color=COLORS['bg_medium'],
@@ -110,12 +105,8 @@ class HistoryTab(ctk.CTkFrame):
         
         hint_label = ctk.CTkLabel(
             empty_content,
-            text="Click 'Add New Visit' to record the first visit",
+            text="Your visit records will appear here",
             font=FONTS['body'],
             text_color=COLORS['text_muted']
         )
         hint_label.pack()
-    
-    def refresh(self):
-        """Refresh visit list"""
-        self.load_visits()
