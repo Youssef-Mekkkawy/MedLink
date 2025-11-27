@@ -8,7 +8,7 @@ from gui.styles import *
 class PatientCard(ctk.CTkFrame):
     """Display patient information card"""
     
-    def __init__(self, parent, patient_data):
+    def __init__(self, parent, patient_data, on_emergency=None):
         super().__init__(
             parent,
             fg_color=COLORS['bg_medium'],
@@ -16,6 +16,7 @@ class PatientCard(ctk.CTkFrame):
         )
         
         self.patient_data = patient_data
+        self.on_emergency = on_emergency
         self.create_ui()
     
     def create_ui(self):
@@ -64,18 +65,21 @@ class PatientCard(ctk.CTkFrame):
         )
         id_label.pack(anchor='w')
         
-        # Emergency button
-        emergency_btn = ctk.CTkButton(
-            header,
-            text="🚨 Emergency Info",
-            font=FONTS['body_bold'],
-            fg_color=COLORS['danger'],
-            hover_color='#dc2626',
-            height=40,
-            width=160
-        )
-        emergency_btn.pack(side='right')
+        # Emergency button (if callback provided)
+        if self.on_emergency:
+            emergency_btn = ctk.CTkButton(
+                header,
+                text="🆘 Emergency Info",
+                command=self.on_emergency,
+                font=FONTS['body_bold'],
+                fg_color=COLORS['danger'],
+                hover_color='#dc2626',
+                height=40,
+                width=160
+            )
+            emergency_btn.pack(side='right')
         
+        # Rest of the card remains the same...
         # Divider
         ctk.CTkFrame(
             content,
