@@ -3,6 +3,7 @@ Doctor dashboard - Main interface for doctors
 """
 import customtkinter as ctk
 from tkinter import messagebox
+from gui.components import add_hospitalization_dialog, add_surgery_dialog, add_vaccination_dialog, disability_dialog, family_history_dialog
 from gui.styles import *
 from gui.components.sidebar import Sidebar
 from gui.components.patient_card import PatientCard
@@ -349,7 +350,7 @@ class DoctorDashboard(ctk.CTkToplevel):
         # Show patient profile
         self.show_patient_profile(patient)
     def show_patient_profile(self, patient):
-        """Display patient profile"""
+        """Display patient profile with all enhanced features"""
         try:
             self.current_patient = patient
             
@@ -368,24 +369,48 @@ class DoctorDashboard(ctk.CTkToplevel):
             )
             tabview.pack(fill='both', expand=True)
             
-            # Add tabs
+            # ========================================
+            # TAB 1: PROFILE (Enhanced Patient Card)
+            # ========================================
             tabview.add("Profile")
-            tabview.add("Medical History")
-            tabview.add("Lab Results")
-            tabview.add("Imaging")
             
-            # Profile tab
             profile_scroll = ctk.CTkScrollableFrame(
                 tabview.tab("Profile"),
                 fg_color='transparent'
             )
             profile_scroll.pack(fill='both', expand=True, padx=10, pady=10)
             
-            # Patient card WITH emergency callback
-            patient_card = PatientCard(profile_scroll, patient, on_emergency=self.show_emergency_card)
+            # Enhanced Patient Card (Phase 3 - with badges)
+            from gui.components.patient_card import EnhancedPatientCard
+            
+            patient_card = EnhancedPatientCard(profile_scroll, patient)
             patient_card.pack(fill='both', expand=True)
             
-            # Medical History tab
+            # ========================================
+            # TAB 2: MEDICAL PROFILE (NEW - Phase 3)
+            # ========================================
+            # This tab includes action buttons for:
+            # - Add Surgery
+            # - Add Hospitalization
+            # - Add Vaccination
+            # - Update Family History
+            # - Update Disability Info
+            tabview.add("Medical Profile")
+            
+            from gui.components.medical_profile_tab import MedicalProfileTab
+            
+            self.medical_profile_tab = MedicalProfileTab(
+                tabview.tab("Medical Profile"),
+                patient,
+                self.user_data  # Doctor data
+            )
+            self.medical_profile_tab.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # ========================================
+            # TAB 3: MEDICAL HISTORY (with Timeline option)
+            # ========================================
+            tabview.add("Medical History")
+            
             from gui.components.history_tab import HistoryTab
             
             self.history_tab = HistoryTab(
@@ -396,33 +421,122 @@ class DoctorDashboard(ctk.CTkToplevel):
             )
             self.history_tab.pack(fill='both', expand=True, padx=10, pady=10)
             
-            # Lab Results tab
-            from gui.components.lab_results_tab import LabResultsTab
+            # ========================================
+            # TAB 4: LAB RESULTS (Enhanced - Phase 5)
+            # ========================================
+            tabview.add("Lab Results")
             
-            self.lab_tab = LabResultsTab(
+            from gui.components.lab_results_manager import EnhancedLabResultsManager
+            
+            self.lab_tab = EnhancedLabResultsManager(
                 tabview.tab("Lab Results"),
                 patient,
-                self.user_data,
-                is_doctor=True
+                is_doctor=True  # Shows "Add Lab Result" button
             )
             self.lab_tab.pack(fill='both', expand=True, padx=10, pady=10)
             
-            # Imaging tab
-            from gui.components.imaging_tab import ImagingTab
+            # ========================================
+            # TAB 5: IMAGING (Enhanced - Phase 5)
+            # ========================================
+            tabview.add("Imaging")
             
-            self.imaging_tab = ImagingTab(
+            from gui.components.imaging_results_manager import EnhancedImagingResultsManager
+            
+            self.imaging_tab = EnhancedImagingResultsManager(
                 tabview.tab("Imaging"),
                 patient,
-                self.user_data,
-                is_doctor=True
+                is_doctor=True  # Shows "Add Imaging" button
             )
             self.imaging_tab.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # Set default tab to Medical Profile (most important)
+            tabview.set("Medical Profile")
         
         except Exception as e:
             print(f"Error showing patient profile: {e}")
             import traceback
             traceback.print_exc()
             messagebox.showerror("Error", f"Could not load patient profile: {str(e)}")
+            """Display patient profile"""
+            try:
+                self.current_patient = patient
+                
+                # Clear content
+                for widget in self.content_frame.winfo_children():
+                    widget.destroy()
+                
+                # Create tabview
+                tabview = ctk.CTkTabview(
+                    self.content_frame,
+                    corner_radius=RADIUS['lg'],
+                    fg_color=COLORS['bg_medium'],
+                    segmented_button_fg_color=COLORS['bg_light'],
+                    segmented_button_selected_color=COLORS['primary'],
+                    segmented_button_unselected_color=COLORS['bg_light']
+                )
+                tabview.pack(fill='both', expand=True)
+                
+                # Add tabs
+                tabview.add("Profile")
+                # Buttons to launch dialogs:
+                # add_surgery_dialog.AddSurgeryDialog()
+                # add_hospitalization_dialog.AddHospitalizationDialog()
+                # add_vaccination_dialog.AddVaccinationDialog()
+                # family_history_dialog.FamilyHistoryDialog()
+                # disability_dialog.DisabilityDialog()
+                tabview.add("Medical History")
+                tabview.add("Lab Results")
+                tabview.add("Imaging")
+                
+                # Profile tab
+                profile_scroll = ctk.CTkScrollableFrame(
+                    tabview.tab("Profile"),
+                    fg_color='transparent'
+                )
+                profile_scroll.pack(fill='both', expand=True, padx=10, pady=10)
+                
+                # Patient card WITH emergency callback
+                patient_card = PatientCard(profile_scroll, patient, on_emergency=self.show_emergency_card)
+                patient_card.pack(fill='both', expand=True)
+                
+                # Medical History tab
+                from gui.components.history_tab import HistoryTab
+                
+                self.history_tab = HistoryTab(
+                    tabview.tab("Medical History"),
+                    patient,
+                    self.user_data,
+                    self.show_add_visit_dialog
+                )
+                self.history_tab.pack(fill='both', expand=True, padx=10, pady=10)
+                
+                # Lab Results tab
+                from gui.components.lab_results_tab import LabResultsTab
+                
+                self.lab_tab = LabResultsTab(
+                    tabview.tab("Lab Results"),
+                    patient,
+                    self.user_data,
+                    is_doctor=True
+                )
+                self.lab_tab.pack(fill='both', expand=True, padx=10, pady=10)
+                
+                # Imaging tab
+                from gui.components.imaging_tab import ImagingTab
+                
+                self.imaging_tab = ImagingTab(
+                    tabview.tab("Imaging"),
+                    patient,
+                    self.user_data,
+                    is_doctor=True
+                )
+                self.imaging_tab.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            except Exception as e:
+                print(f"Error showing patient profile: {e}")
+                import traceback
+                traceback.print_exc()
+                messagebox.showerror("Error", f"Could not load patient profile: {str(e)}")
 
     def show_emergency_card(self):
         """Show emergency card for current patient"""
