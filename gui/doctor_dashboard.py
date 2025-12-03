@@ -135,8 +135,22 @@ class DoctorDashboard(ctk.CTkToplevel):
                 fg_color=COLORS['primary'],
                 hover_color=COLORS['primary_hover']
             )
-            search_btn.pack(side='left')
-
+            search_btn.pack(side='left', padx=(0, 20))
+            
+            # Emergency Card button (top right) - hidden initially
+            self.emergency_btn = ctk.CTkButton(
+                top_content,
+                text="🆘 Emergency Card",
+                command=self.show_emergency_card,
+                font=FONTS['body_bold'],
+                height=45,
+                width=180,
+                corner_radius=RADIUS['md'],
+                fg_color=COLORS['danger'],
+                hover_color='#b91c1c'
+            )
+            self.emergency_btn.pack(side='right')
+            self.emergency_btn.pack_forget()  # Hide initially
             print("Search bar created")  # Debug
 
             # Content area with tabs
@@ -357,7 +371,8 @@ class DoctorDashboard(ctk.CTkToplevel):
         """Display patient profile with all enhanced features"""
         try:
             self.current_patient = patient
-            
+            if hasattr(self, 'emergency_btn'):
+                self.emergency_btn.pack(side='right')
             # Clear content
             for widget in self.content_frame.winfo_children():
                 widget.destroy()
@@ -468,7 +483,7 @@ class DoctorDashboard(ctk.CTkToplevel):
                 # Clear content
                 for widget in self.content_frame.winfo_children():
                     widget.destroy()
-                
+               
                 # Create tabview
                 tabview = ctk.CTkTabview(
                     self.content_frame,
