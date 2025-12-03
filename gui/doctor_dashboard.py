@@ -694,98 +694,101 @@ class DoctorDashboard(ctk.CTkToplevel):
         dialog = EmergencyDialog(self, self.current_patient)
         dialog.wait_window()
 
-
     def on_key_press(self, event):
-        """Handle key press for NFC card reading"""
+        """Handle NFC card scanning"""
         if not self.card_reading_active:
             return
 
-        # Don't interfere if user is typing in entry fields
-        focused_widget = self.focus_get()
-        if isinstance(focused_widget, ctk.CTkEntry) or isinstance(focused_widget, ctk.CTkTextbox):
+        # Don't interfere if typing
+        focused = self.focus_get()
+        if isinstance(focused, ctk.CTkEntry) or isinstance(focused, ctk.CTkTextbox):
             return
 
-        # Enter key means card scan complete
+        # Enter = card complete
         if event.keysym == "Return":
             card_id = self.card_buffer.strip()
-            self.card_buffer = ""  # Reset buffer
+            self.card_buffer = ""
 
-            if card_id and len(card_id) >= 8:  # Valid card ID
-                self.process_patient_card(card_id)
+            if card_id and len(card_id) >= 8:
+                self.process_card(card_id)
         else:
-            # Append characters (ignore special keys)
             if len(event.char) > 0 and event.char.isprintable():
                 self.card_buffer += event.char
 
 
-    def process_patient_card(self, card_id: str):
-        """Process scanned patient NFC card"""
-        print(f"Patient card scanned: {card_id}")
-
+    def process_card(self, card_id: str):
+        """Process scanned NFC card"""
         from core.card_manager import card_manager
+        from core.data_manager import data_manager
+        from core.search_engine import search_engine
+        from tkinter import messagebox
 
-        # Visual feedback - flash NFC indicator
-        self.nfc_indicator.configure(text_color=COLORS['warning'])
-        self.update()
+        print(f"🔍 Card scanned: {card_id}")
 
-        # Get patient from card
         user_info = card_manager.get_user_by_card(card_id)
 
         if not user_info:
-            self.nfc_indicator.configure(text_color=COLORS['danger'])
-            messagebox.showerror(
-                "Card Error",
-                f"Patient card {card_id} is not registered.\n\n"
-                "Please register the card or search manually."
-            )
-            self.after(2000, lambda: self.nfc_indicator.configure(
-                text_color=COLORS['success']))
+            messagebox.showerror("Card Not Registered",
+                                f"Card {card_id} not registered")
             return
 
-        if user_info.get('type') != 'patient':
-            self.nfc_indicator.configure(text_color=COLORS['danger'])
-            messagebox.showerror(
-                "Card Error",
-                "This is not a patient card. Please use a patient card."
+        user_type = user_info.get('type')
+
+        if user_type == 'doctor':
+            # Doctor card → Switch doctor
+            username = user_info.get('username')
+            doctor_name = user_info.get('name', '')
+
+            confirm = messagebox.askyesno(
+                "Switch Doctor",
+                f"Switch to {doctor_name}?\n\n"
+                "This will logout current doctor."
             )
-            self.after(2000, lambda: self.nfc_indicator.configure(
-                text_color=COLORS['success']))
-            return
 
-        # Get national ID from card
-        national_id = user_info.get('national_id')
+            if not confirm:
+                return
 
-        # Success feedback
-        self.nfc_indicator.configure(text_color=COLORS['success'])
+            users_data = data_manager.load_data('users')
+            users = users_data.get('users', [])
 
-        # Update search entry (visual feedback)
-        self.search_entry.delete(0, 'end')
-        self.search_entry.insert(0, national_id)
+            new_doctor = None
+            for user in users:
+                if user.get('username') == username and user.get('role') == 'doctor':
+                    new_doctor = user
+                    break
 
-        # Search patient
-        from core.search_engine import search_engine
-        patient = search_engine.search_by_national_id(national_id)
+            if new_doctor:
+                messagebox.showinfo("Doctor Switched",
+                                    f"Now logged in as {doctor_name}")
 
-        if patient:
-            # Show success message
-            # messagebox.showinfo(
-            #     "Patient Found",
-            #     f"Patient: {patient.get('full_name', 'Unknown')}\n"
-            #     f"Card scan successful!"
-            # )
-            print("Patient Found",
-               f"Patient: {patient.get('full_name', 'Unknown')}\n"
-               f"Card scan successful!")
-            # Show patient profile
-            self.show_patient_profile(patient)
-        else:
-            self.nfc_indicator.configure(text_color=COLORS['danger'])
-            messagebox.showerror(
-                "Patient Not Found",
-                f"Patient with ID {national_id} not found in system."
-            )
-            self.after(2000, lambda: self.nfc_indicator.configure(
-                text_color=COLORS['success']))
+                self.destroy()
+
+                from gui.doctor_dashboard import DoctorDashboard
+                new_dashboard = DoctorDashboard(self.parent, new_doctor)
+                new_dashboard.protocol("WM_DELETE_WINDOW",
+                                    lambda: self.parent.on_dashboard_close(new_dashboard))
+            else:
+                messagebox.showerror("Error", "Doctor not found")
+
+        elif user_type == 'patient':
+            # Patient card → Search patient
+            national_id = user_info.get('national_id')
+            patient_name = user_info.get('name', '')
+
+            if hasattr(self, 'search_entry'):
+                self.search_entry.delete(0, 'end')
+                self.search_entry.insert(0, national_id)
+
+            results = search_engine.search_patients(national_id)
+
+            if results:
+                patient = results[0]
+                messagebox.showinfo("Patient Found",
+                                    f"Found: {patient_name}\n\nOpening profile...")
+                self.show_patient_profile(patient)
+            else:
+                messagebox.showerror("Not Found",
+                                    f"Patient {patient_name} not found")
 
 
 if __name__ == "__main__":
