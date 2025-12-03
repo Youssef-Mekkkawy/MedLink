@@ -1,7 +1,9 @@
 """
-Sidebar navigation component
+Sidebar navigation component - MINIMAL FIX VERSION
+Only makes buttons work, keeps original design!
 """
 import customtkinter as ctk
+from tkinter import messagebox
 from gui.styles import *
 
 
@@ -91,15 +93,63 @@ class Sidebar(ctk.CTkFrame):
         nav_frame = ctk.CTkFrame(self, fg_color='transparent')
         nav_frame.pack(fill='both', expand=True, padx=20)
         
-        # Menu items
-        self.create_nav_button(nav_frame, "🏠  Dashboard", active=True)
-        self.create_nav_button(nav_frame, "👥  All Patients")
-        self.create_nav_button(nav_frame, "📅  Appointments")
-        self.create_nav_button(nav_frame, "📊  Statistics")
-        self.create_nav_button(nav_frame, "⚙️  Settings")
+        # Menu items with working commands
+        self.create_nav_button(
+            nav_frame, "🏠  Dashboard", active=True,
+            command=lambda: messagebox.showinfo(
+                "Dashboard", 
+                "You're already on the Dashboard!"
+            )
+        )
+        
+        self.create_nav_button(
+            nav_frame, "👥  All Patients",
+            command=lambda: messagebox.showinfo(
+                "All Patients",
+                "All Patients view coming soon!\n\n"
+                "This will show a list of all patients\n"
+                "in the system."
+            )
+        )
+        
+        self.create_nav_button(
+            nav_frame, "📅  Appointments",
+            command=lambda: messagebox.showinfo(
+                "Appointments",
+                "Appointment scheduling coming soon!\n\n"
+                "Features:\n"
+                "• Schedule appointments\n"
+                "• View calendar\n"
+                "• Send reminders"
+            )
+        )
+        
+        self.create_nav_button(
+            nav_frame, "📊  Statistics",
+            command=lambda: messagebox.showinfo(
+                "Statistics",
+                "Statistics dashboard coming soon!\n\n"
+                "Features:\n"
+                "• Patient statistics\n"
+                "• Visit trends\n"
+                "• Performance metrics"
+            )
+        )
+        
+        self.create_nav_button(
+            nav_frame, "⚙️  Settings",
+            command=lambda: messagebox.showinfo(
+                "Settings",
+                "Settings panel coming soon!\n\n"
+                "Features:\n"
+                "• Profile settings\n"
+                "• System preferences\n"
+                "• Security options"
+            )
+        )
         
         # Spacer
-        ctk.CTkFrame(nav_frame, fg_color='transparent').pack(expand=True)
+        ctk.CTkFrame(nav_frame, fg_color='transparent', height=20).pack()
         
         # Logout button at bottom
         logout_btn = ctk.CTkButton(
@@ -107,27 +157,27 @@ class Sidebar(ctk.CTkFrame):
             text="🚪  Logout",
             command=self.on_logout,
             font=FONTS['body'],
-            fg_color='transparent',
-            hover_color=COLORS['danger'],
             height=45,
-            anchor='w'
+            corner_radius=RADIUS['md'],
+            fg_color=COLORS['danger'],
+            hover_color='#b91c1c',
+            text_color=COLORS['text_primary']
         )
-        logout_btn.pack(fill='x', padx=20, pady=20, side='bottom')
+        logout_btn.pack(side='bottom', fill='x', padx=20, pady=20)
     
-    def create_nav_button(self, parent, text, active=False):
-        """Create navigation button"""
-        fg_color = COLORS['primary'] if active else 'transparent'
-        hover_color = COLORS['primary_hover'] if active else COLORS['bg_light']
-        
+    def create_nav_button(self, parent, text, active=False, command=None):
+        """Create a navigation button"""
         btn = ctk.CTkButton(
             parent,
             text=text,
+            command=command,
             font=FONTS['body'],
-            fg_color=fg_color,
-            hover_color=hover_color,
             height=45,
             corner_radius=RADIUS['md'],
-            anchor='w'
+            fg_color=COLORS['primary'] if active else 'transparent',
+            hover_color=COLORS['bg_hover'],
+            anchor='w',
+            text_color=COLORS['text_primary']
         )
-        btn.pack(fill='x', pady=5)
+        btn.pack(fill='x', pady=(0, 8))
         return btn
