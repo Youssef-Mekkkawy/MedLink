@@ -110,9 +110,7 @@ def test_enhanced_data_model():
             if ed.get('power_of_attorney', {}).get('has_poa'):
                 poa = ed['power_of_attorney']
                 print(f"  Power of Attorney: {poa.get('name')} ({poa.get('relation')})")
-            if ed.get('religious_preferences'):
-                print(f"  Religion: {ed['religious_preferences'].get('religion')}")
-        
+            
         # Test lifestyle
         if 'lifestyle' in patient:
             valid, msg = validate_lifestyle_data(patient['lifestyle'])
