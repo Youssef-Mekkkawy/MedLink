@@ -527,16 +527,19 @@ class DoctorDashboard(ctk.CTkToplevel):
                 tabview.pack(fill='both', expand=True)
 
                 # Add tabs
-                tabview.add("Profile")
-                # Buttons to launch dialogs:
-                # add_surgery_dialog.AddSurgeryDialog()
-                # add_hospitalization_dialog.AddHospitalizationDialog()
-                # add_vaccination_dialog.AddVaccinationDialog()
-                # family_history_dialog.FamilyHistoryDialog()
-                # disability_dialog.DisabilityDialog()
-                tabview.add("Medical History")
-                tabview.add("Lab Results")
-                tabview.add("Imaging")
+                # Profile tab
+                profile_scroll = ctk.CTkScrollableFrame(
+                    tabview.tab("Profile"),
+                    fg_color='transparent'
+                )
+                profile_scroll.pack(fill='both', expand=True, padx=10, pady=10)
+                
+                self.patient_card = PatientCard(
+                    profile_scroll,
+                    patient,
+                    on_emergency=self.show_emergency_card
+                )
+                self.patient_card.pack(fill='both', expand=True)
 
                 # Profile tab
                 profile_scroll = ctk.CTkScrollableFrame(
@@ -544,12 +547,10 @@ class DoctorDashboard(ctk.CTkToplevel):
                     fg_color='transparent'
                 )
                 profile_scroll.pack(fill='both', expand=True, padx=10, pady=10)
-
-                # Patient card WITH emergency callback
-                patient_card = PatientCard(
-                    profile_scroll, patient, on_emergency=self.show_emergency_card)
-                patient_card.pack(fill='both', expand=True)
-
+                
+                tabview.add("Medical History")
+                tabview.add("Lab Results")
+                tabview.add("Imaging")
                 # Medical History tab
                 from gui.components.history_tab import HistoryTab
 
