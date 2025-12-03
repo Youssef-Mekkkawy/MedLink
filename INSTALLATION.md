@@ -417,7 +417,7 @@ python main.py
 **Patient Login**:
 - Role: Patient
 - Username: `29501012345678`
-- Password: `patient123`
+- Password: `patient + last 3 digit from national id`
 
 ---
 

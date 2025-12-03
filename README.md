@@ -406,7 +406,7 @@ python main.py
 **Patient Account:**
 - Role: Patient
 - Username: `29501012345678` (National ID)
-- Password: `patient123`
+- Password: `patient + last 3 digit from national id`
 
 ---
 
