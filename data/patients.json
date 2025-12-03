@@ -87,10 +87,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -204,10 +201,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -355,10 +349,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -478,10 +469,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -611,10 +599,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": true
       },
@@ -768,10 +753,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -885,10 +867,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -1002,10 +981,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -1149,10 +1125,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": true
       },
@@ -1290,10 +1263,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -1455,10 +1425,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -1620,10 +1587,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -1785,10 +1749,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -1920,10 +1881,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": true
       },
@@ -2055,10 +2013,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -2201,10 +2156,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -2364,10 +2316,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -2529,10 +2478,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -2652,10 +2598,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": true
       },
@@ -2782,10 +2725,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": true
       },
@@ -2915,10 +2855,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3038,10 +2975,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3161,10 +3095,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3294,10 +3225,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3435,10 +3363,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3576,10 +3501,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3693,10 +3615,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3816,10 +3735,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "No special requirements"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },
@@ -3933,10 +3849,7 @@
           "document_date": null
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": true
       },
@@ -4078,10 +3991,7 @@
           "document_date": "2022-03-15"
         },
         "living_will": false,
-        "religious_preferences": {
-          "religion": "Islam",
-          "special_considerations": "Halal medications preferred"
-        },
+        
         "blood_transfusion_consent": true,
         "tissue_donation": false
       },

@@ -59,8 +59,7 @@ class EmergencyDirectivesManager(ctk.CTkFrame):
         # Power of Attorney Section
         self.create_power_of_attorney_section(scroll_frame)
         
-        # Religious Preferences Section
-        self.create_religious_preferences_section(scroll_frame)
+        
         
         # Advanced Directives Section
         self.create_advanced_directives_section(scroll_frame)
@@ -314,51 +313,13 @@ class EmergencyDirectivesManager(ctk.CTkFrame):
         )
         self.poa_date_entry.pack(fill='x')
     
-    def create_religious_preferences_section(self, parent):
-        """Create religious preferences section"""
-        card = self.create_section_card(parent, "🕌 Religious Preferences")
+    
+       
         
         content = ctk.CTkFrame(card, fg_color='transparent')
         content.pack(fill='x', padx=20, pady=(0, 15))
         
-        # Religion
-        religion_label = ctk.CTkLabel(
-            content,
-            text="Religion:",
-            font=FONTS['body'],
-            text_color=COLORS['text_secondary']
-        )
-        religion_label.pack(anchor='w', pady=(0, 5))
         
-        self.religion_entry = ctk.CTkOptionMenu(
-            content,
-            values=["Islam", "Christianity", "Judaism", "Buddhism", "Hinduism", "Other", "None"],
-            font=FONTS['body'],
-            height=40
-        )
-        self.religion_entry.pack(fill='x', pady=(0, 15))
-        
-        # Special Considerations
-        considerations_label = ctk.CTkLabel(
-            content,
-            text="Special Religious Considerations:",
-            font=FONTS['body'],
-            text_color=COLORS['text_secondary']
-        )
-        considerations_label.pack(anchor='w', pady=(0, 5))
-        
-        self.religious_considerations_entry = ctk.CTkTextbox(
-            content,
-            font=FONTS['body'],
-            height=80,
-            wrap='word'
-        )
-        self.religious_considerations_entry.pack(fill='x')
-        
-        placeholder_text = "e.g., Halal food only, No blood products, Prayer times, Religious items"
-        self.religious_considerations_entry.insert("1.0", placeholder_text)
-        self.religious_considerations_entry.bind("<FocusIn>", lambda e: self.clear_placeholder(self.religious_considerations_entry, placeholder_text))
-    
     def create_advanced_directives_section(self, parent):
         """Create advanced directives section"""
         card = self.create_section_card(parent, "📄 Living Will & Advanced Directives")
@@ -476,13 +437,7 @@ class EmergencyDirectivesManager(ctk.CTkFrame):
         
         self.toggle_poa_fields()
         
-        # Religious Preferences
-        religious = self.emergency_directives.get('religious_preferences', {})
-        if religious.get('religion'):
-            self.religion_entry.set(religious['religion'])
-        if religious.get('special_considerations'):
-            self.religious_considerations_entry.delete("1.0", "end")
-            self.religious_considerations_entry.insert("1.0", religious['special_considerations'])
+    
         
         # Living Will
         if self.emergency_directives.get('living_will'):
@@ -529,17 +484,8 @@ class EmergencyDirectivesManager(ctk.CTkFrame):
             
             directives['power_of_attorney'] = poa_data
             
-            # Religious Preferences
-            religious_considerations = self.religious_considerations_entry.get("1.0", "end-1c").strip()
-            placeholder = "e.g., Halal food only, No blood products, Prayer times, Religious items"
-            if religious_considerations == placeholder:
-                religious_considerations = None
-            
-            directives['religious_preferences'] = {
-                'religion': self.religion_entry.get(),
-                'special_considerations': religious_considerations
-            }
-            
+           
+
             # Living Will
             directives['living_will'] = self.living_will_checkbox.get()
             
