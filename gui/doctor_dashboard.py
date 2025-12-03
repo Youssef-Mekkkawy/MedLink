@@ -783,8 +783,9 @@ class DoctorDashboard(ctk.CTkToplevel):
 
             if results:
                 patient = results[0]
-                messagebox.showinfo("Patient Found",
-                                    f"Found: {patient_name}\n\nOpening profile...")
+                # messagebox.showinfo("Patient Found",
+                #                     f"Found: {patient_name}\n\nOpening profile...")
+                print(f"Patient Found: {patient_name}\nOpening profile...")
                 self.show_patient_profile(patient)
             else:
                 messagebox.showerror("Not Found",
