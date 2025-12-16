@@ -1,295 +1,228 @@
 """
-Fingerprint authentication manager for R307 sensor
+Fingerprint Manager - Biometric Authentication
+MySQL Version - Compatible with existing GUI
 """
-import serial
-from datetime import datetime
-import struct
-from typing import Optional, Tuple
-from config.hardware_config import FINGERPRINT_CONFIG
-from core.data_manager import data_manager
-from utils.logger import log_hardware_event
 
+from datetime import datetime
+from core.database import get_db
+from core.models import Doctor, User, HardwareAuditLog
+import uuid
 
 class FingerprintManager:
-    """Manages R307 fingerprint sensor operations"""
-
-    # R307 Command Packets
-    ADDR = 0xFFFFFFFF
-    CMD_HANDSHAKE = 0x01
-    CMD_GEN_IMG = 0x01
-    CMD_IMG_2_TZ = 0x02
-    CMD_MATCH = 0x03
-    CMD_SEARCH = 0x04
-    CMD_REG_MODEL = 0x05
-    CMD_STORE = 0x06
-    CMD_LOAD = 0x07
-    CMD_DELETE = 0x0C
-    CMD_EMPTY = 0x0D
-    CMD_GET_COUNT = 0x1D
-
+    """Manage fingerprint biometric authentication for doctors"""
+    
     def __init__(self):
-        self.port = FINGERPRINT_CONFIG['port']
-        self.baudrate = FINGERPRINT_CONFIG['baudrate']
-        self.ser = None
-        self.is_connected = False
-
-    def connect(self) -> Tuple[bool, str]:
+        pass
+    
+    def enroll_fingerprint(self, user_id, fingerprint_id):
         """
-        Connect to R307 fingerprint sensor
-
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            self.ser = serial.Serial(
-                port=self.port,
-                baudrate=self.baudrate,
-                timeout=FINGERPRINT_CONFIG['timeout']
-            )
-
-            # Send handshake
-            if self._send_command(self.CMD_HANDSHAKE):
-                self.is_connected = True
-                return True, "Fingerprint sensor connected successfully"
-            else:
-                return False, "Handshake failed - sensor not responding"
-
-        except serial.SerialException as e:
-            return False, f"Connection error: {str(e)}"
-
-    def disconnect(self):
-        """Disconnect from sensor"""
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-        self.is_connected = False
-
-    def enroll_fingerprint(self, user_id: str, user_name: str) -> Tuple[bool, str, Optional[int]]:
-        """
-        Enroll new fingerprint for user
-
+        Enroll fingerprint for doctor
+        
         Args:
-            user_id: User ID
-            user_name: User display name
-
-        Returns:
-            (success: bool, message: str, fingerprint_id: int or None)
+            user_id: Doctor's user_id
+            fingerprint_id: Fingerprint sensor ID (from hardware)
         """
-        if not self.is_connected:
-            success, msg = self.connect()
-            if not success:
-                return False, msg, None
-
-        try:
-            # Find next available slot
-            next_id = self._get_next_available_id()
-            if next_id is None:
-                return False, "No available fingerprint slots", None
-
-            # Step 1: Capture first image
-            print(f"Place {user_name}'s finger on sensor...")
-            if not self._capture_image():
-                return False, "Failed to capture first image", None
-
-            if not self._generate_template(buffer=1):
-                return False, "Failed to generate first template", None
-
-            print("Remove finger and place again...")
-            import time
-            time.sleep(2)
-
-            # Step 2: Capture second image
-            if not self._capture_image():
-                return False, "Failed to capture second image", None
-
-            if not self._generate_template(buffer=2):
-                return False, "Failed to generate second template", None
-
-            # Step 3: Create model from both templates
-            if not self._create_model():
-                return False, "Templates do not match", None
-
-            # Step 4: Store model
-            if not self._store_template(next_id):
-                return False, "Failed to store template", None
-
-            # Step 5: Update database
-            user = data_manager.find_item('users', 'users', 'user_id', user_id)
-            if user:
-                user['fingerprint_id'] = next_id
-                user['fingerprint_enrolled'] = True
-                user['fingerprint_enrollment_date'] = datetime.now().strftime(
-                    "%Y-%m-%d")
-
-                data_manager.update_item(
-                    'users', 'users', user_id, 'user_id', user)
-
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+            
+            if not doctor:
+                return {'success': False, 'message': 'Doctor not found'}
+            
+            # Check if fingerprint ID already used
+            existing = db.query(Doctor).filter(
+                Doctor.fingerprint_id == fingerprint_id,
+                Doctor.fingerprint_enrolled == True
+            ).first()
+            
+            if existing and existing.user_id != user_id:
+                return {'success': False, 'message': 'Fingerprint already enrolled to another doctor'}
+            
+            # Enroll fingerprint
+            doctor.fingerprint_id = fingerprint_id
+            doctor.fingerprint_enrolled = True
+            doctor.fingerprint_enrollment_date = datetime.now().date()
+            doctor.biometric_enabled = True
+            
+            db.commit()
+            
             # Log event
-            log_hardware_event(
-                event_type='fingerprint_enrollment',
-                user_id=user_id,
-                fingerprint_id=next_id,
-                success=True
-            )
-
-            return True, f"Fingerprint enrolled successfully at position {next_id}", next_id
-
-        except Exception as e:
-            return False, f"Enrollment error: {str(e)}", None
-
-    def authenticate_fingerprint(self) -> Tuple[bool, Optional[dict], str]:
+            self._log_fingerprint_event(user_id, 'enrollment', True)
+            
+            return {'success': True, 'message': 'Fingerprint enrolled successfully'}
+    
+    def authenticate_fingerprint(self, fingerprint_id):
         """
-        Authenticate user by fingerprint scan
-
-        Returns:
-            (success: bool, user_data: dict or None, message: str)
-        """
-        if not self.is_connected:
-            success, msg = self.connect()
-            if not success:
-                return False, None, msg
-
-        try:
-            print("Place finger on sensor...")
-
-            # Capture image
-            if not self._capture_image():
-                return False, None, "Failed to capture fingerprint"
-
-            # Generate template
-            if not self._generate_template(buffer=1):
-                return False, None, "Failed to generate template"
-
-            # Search for match
-            finger_id, confidence = self._search_fingerprint()
-
-            if finger_id == -1:
-                log_hardware_event(
-                    event_type='fingerprint_login',
-                    fingerprint_id=None,
-                    success=False
-                )
-                return False, None, "Fingerprint not recognized"
-
-            # Find user with this fingerprint ID
-            users = data_manager.load_data('users')
-            for user in users.get('users', []):
-                if user.get('fingerprint_id') == finger_id:
-                    # Log successful authentication
-                    log_hardware_event(
-                        event_type='fingerprint_login',
-                        user_id=user['user_id'],
-                        fingerprint_id=finger_id,
-                        success=True,
-                        confidence=confidence
-                    )
-
-                    # Update last login
-                    user['last_fingerprint_login'] = datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S")
-                    data_manager.update_item(
-                        'users', 'users', user['user_id'], 'user_id', user)
-
-                    return True, user, f"Welcome {user['full_name']}! (Confidence: {confidence}%)"
-
-            return False, None, "Fingerprint found but user not in database"
-
-        except Exception as e:
-            return False, None, f"Authentication error: {str(e)}"
-
-    def delete_fingerprint(self, user_id: str) -> Tuple[bool, str]:
-        """
-        Delete user's fingerprint from sensor
-
+        Authenticate doctor by fingerprint
+        
         Args:
-            user_id: User ID
-
+            fingerprint_id: Fingerprint ID from sensor
+        
         Returns:
-            (success: bool, message: str)
+            dict with user info if successful
         """
-        try:
-            user = data_manager.find_item('users', 'users', 'user_id', user_id)
-            if not user or not user.get('fingerprint_enrolled'):
-                return False, "User has no enrolled fingerprint"
-
-            finger_id = user.get('fingerprint_id')
-
-            # Delete from sensor
-            if not self._delete_template(finger_id):
-                return False, "Failed to delete from sensor"
-
-            # Update database
-            user['fingerprint_id'] = None
-            user['fingerprint_enrolled'] = False
-            data_manager.update_item(
-                'users', 'users', user_id, 'user_id', user)
-
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(
+                Doctor.fingerprint_id == fingerprint_id,
+                Doctor.fingerprint_enrolled == True,
+                Doctor.biometric_enabled == True
+            ).first()
+            
+            if not doctor:
+                self._log_fingerprint_event(None, 'authentication_failed', False, fingerprint_id)
+                return {'success': False, 'message': 'Fingerprint not recognized'}
+            
+            # Get user info
+            user = db.query(User).filter(User.user_id == doctor.user_id).first()
+            
+            if not user or user.account_status != 'active':
+                self._log_fingerprint_event(doctor.user_id, 'authentication_failed', False)
+                return {'success': False, 'message': 'Account inactive'}
+            
+            # Update login info
+            user.last_login = datetime.now()
+            user.login_count += 1
+            
+            doctor.last_fingerprint_login = datetime.now()
+            doctor.fingerprint_login_count += 1
+            
+            db.commit()
+            
+            # Log successful authentication
+            self._log_fingerprint_event(doctor.user_id, 'authentication_success', True, fingerprint_id)
+            
+            return {
+                'success': True,
+                'user_id': user.user_id,
+                'username': user.username,
+                'full_name': user.full_name,
+                'role': user.role,
+                'specialization': doctor.specialization
+            }
+    
+    def remove_fingerprint(self, user_id):
+        """Remove fingerprint enrollment"""
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+            
+            if not doctor:
+                return {'success': False, 'message': 'Doctor not found'}
+            
+            doctor.fingerprint_id = None
+            doctor.fingerprint_enrolled = False
+            doctor.biometric_enabled = False
+            
+            db.commit()
+            
             # Log event
-            log_hardware_event(
-                event_type='fingerprint_deletion',
+            self._log_fingerprint_event(user_id, 'fingerprint_removed', True)
+            
+            return {'success': True, 'message': 'Fingerprint removed'}
+    
+    def is_enrolled(self, user_id):
+        """Check if doctor has fingerprint enrolled"""
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+            return doctor and doctor.fingerprint_enrolled
+    
+    def enable_biometric(self, user_id):
+        """Enable biometric authentication"""
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+            
+            if not doctor:
+                return {'success': False, 'message': 'Doctor not found'}
+            
+            if not doctor.fingerprint_enrolled:
+                return {'success': False, 'message': 'No fingerprint enrolled'}
+            
+            doctor.biometric_enabled = True
+            db.commit()
+            
+            return {'success': True, 'message': 'Biometric enabled'}
+    
+    def disable_biometric(self, user_id):
+        """Disable biometric authentication"""
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+            
+            if not doctor:
+                return {'success': False, 'message': 'Doctor not found'}
+            
+            doctor.biometric_enabled = False
+            db.commit()
+            
+            return {'success': True, 'message': 'Biometric disabled'}
+    
+    def get_fingerprint_stats(self, user_id):
+        """Get fingerprint usage statistics"""
+        with get_db() as db:
+            doctor = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+            
+            if not doctor:
+                return None
+            
+            return {
+                'enrolled': doctor.fingerprint_enrolled,
+                'enabled': doctor.biometric_enabled,
+                'enrollment_date': doctor.fingerprint_enrollment_date,
+                'last_login': doctor.last_fingerprint_login,
+                'login_count': doctor.fingerprint_login_count
+            }
+    
+    def get_all_enrolled_doctors(self):
+        """Get all doctors with fingerprint enrolled"""
+        with get_db() as db:
+            doctors = db.query(Doctor).filter(
+                Doctor.fingerprint_enrolled == True
+            ).all()
+            
+            return [{
+                'user_id': d.user_id,
+                'full_name': d.user.full_name if d.user else 'Unknown',
+                'fingerprint_id': d.fingerprint_id,
+                'enabled': d.biometric_enabled,
+                'login_count': d.fingerprint_login_count
+            } for d in doctors]
+    
+    def _log_fingerprint_event(self, user_id, event_type, success, fingerprint_id=None):
+        """Log fingerprint event to audit log"""
+        with get_db() as db:
+            log = HardwareAuditLog(
+                event_id=f"FP-{uuid.uuid4().hex[:12]}",
+                timestamp=datetime.now(),
+                event_type=f"fingerprint_{event_type}",
                 user_id=user_id,
-                fingerprint_id=finger_id,
-                success=True
+                fingerprint_id=fingerprint_id,
+                accessed_by=user_id,
+                access_type='fingerprint',
+                success=success
             )
-
-            return True, "Fingerprint deleted successfully"
-
-        except Exception as e:
-            return False, f"Deletion error: {str(e)}"
-
-    # Private helper methods
-    def _send_command(self, cmd: int, data: bytes = b'') -> bool:
-        """Send command packet to sensor"""
-        # Implementation details...
-        pass
-
-    def _capture_image(self) -> bool:
-        """Capture fingerprint image"""
-        # Implementation details...
-        pass
-
-    def _generate_template(self, buffer: int) -> bool:
-        """Generate template from image"""
-        # Implementation details...
-        pass
-
-    def _create_model(self) -> bool:
-        """Create model from templates"""
-        # Implementation details...
-        pass
-
-    def _store_template(self, position: int) -> bool:
-        """Store template at position"""
-        # Implementation details...
-        pass
-
-    def _search_fingerprint(self) -> Tuple[int, int]:
-        """
-        Search for fingerprint match
-        Returns: (finger_id, confidence_score)
-        """
-        # Implementation details...
-        pass
-
-    def _delete_template(self, position: int) -> bool:
-        """Delete template at position"""
-        # Implementation details...
-        pass
-
-    def _get_next_available_id(self) -> Optional[int]:
-        """Find next available fingerprint slot"""
-        users = data_manager.load_data('users')
-        used_ids = set()
-
-        for user in users.get('users', []):
-            if user.get('fingerprint_enrolled'):
-                used_ids.add(user.get('fingerprint_id'))
-
-        for i in range(1, FINGERPRINT_CONFIG['max_templates'] + 1):
-            if i not in used_ids:
-                return i
-
-        return None
-
+            db.add(log)
+            db.commit()
+    
+    def get_fingerprint_logs(self, user_id=None, limit=50):
+        """Get fingerprint authentication logs"""
+        with get_db() as db:
+            query = db.query(HardwareAuditLog).filter(
+                HardwareAuditLog.event_type.like('fingerprint_%')
+            )
+            
+            if user_id:
+                query = query.filter(HardwareAuditLog.user_id == user_id)
+            
+            return query.order_by(
+                HardwareAuditLog.timestamp.desc()
+            ).limit(limit).all()
+    
+    def get_failed_attempts(self, limit=20):
+        """Get recent failed fingerprint attempts"""
+        with get_db() as db:
+            return db.query(HardwareAuditLog).filter(
+                HardwareAuditLog.event_type == 'fingerprint_authentication_failed',
+                HardwareAuditLog.success == False
+            ).order_by(
+                HardwareAuditLog.timestamp.desc()
+            ).limit(limit).all()
 
 # Global instance
 fingerprint_manager = FingerprintManager()

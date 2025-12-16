@@ -1,246 +1,232 @@
 """
-Family history manager - Handle patient family medical history
-Location: core/family_history_manager.py
+Family History Manager - Manage Patient Family Medical History
+MySQL Version - Compatible with existing GUI
 """
-from typing import Dict, Optional, Tuple
-from core.data_manager import data_manager
-from utils.date_utils import get_current_datetime
-from utils.enhanced_validators import validate_family_history
 
+from datetime import datetime
+from core.database import get_db
+from core.models import FamilyHistory, Patient
 
 class FamilyHistoryManager:
-    """Manages patient family medical history"""
-
+    """Manage patient family medical history"""
+    
     def __init__(self):
-        self.data_manager = data_manager
-
-    def get_family_history(self, national_id: str) -> Optional[Dict]:
+        pass
+    
+    def add_family_member(self, national_id, family_data):
         """
-        Get family medical history for a patient
-
-        Args:
-            national_id: Patient's national ID
-
-        Returns:
-            Family history dictionary or None
+        Add family member medical history
+        
+        family_data should contain:
+        - relation: str (e.g., 'Father', 'Mother', 'Sibling', 'Grandparent')
+        - is_alive: bool
+        - age: int (if alive)
+        - age_at_death: int (if deceased)
+        - cause_of_death: str (if deceased)
+        - medical_conditions: list
+        - notes: str (optional)
         """
-        # Get patient data
-        patient = self.data_manager.find_item(
-            'patients', 'patients', 'national_id', national_id)
-
-        if not patient:
-            return None
-
-        return patient.get('family_history', {})
-
-    def update_family_history(self, national_id: str, family_history_data: Dict) -> Tuple[bool, str]:
-        """
-        Update complete family medical history
-
-        Args:
-            national_id: Patient's national ID
-            family_history_data: Complete family history dictionary
-
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Validate family history data
-            valid, msg = validate_family_history(family_history_data)
-            if not valid:
-                return False, f"Validation error: {msg}"
-
-            # Get patient
-            patient = self.data_manager.find_item(
-                'patients', 'patients', 'national_id', national_id)
-
+        with get_db() as db:
+            # Check if patient exists
+            patient = db.query(Patient).filter(
+                Patient.national_id == national_id
+            ).first()
+            
             if not patient:
-                return False, "Patient not found"
-
-            # Add timestamp
-            family_history_data['last_updated'] = get_current_datetime()
-
-            # Update family history
-            patient['family_history'] = family_history_data
-
-            # Update patient in database
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
+                return {'success': False, 'message': 'Patient not found'}
+            
+            family_member = FamilyHistory(
+                patient_national_id=national_id,
+                **family_data
             )
-
-            if success:
-                return True, "Family history updated successfully"
-            else:
-                return False, "Failed to update family history"
-
-        except Exception as e:
-            return False, f"Error updating family history: {str(e)}"
-
-    def update_father_info(self, national_id: str, father_data: Dict) -> Tuple[bool, str]:
-        """Update father's medical information"""
-        try:
-            family_history = self.get_family_history(national_id) or {}
-            family_history['father'] = father_data
-
-            return self.update_family_history(national_id, family_history)
-        except Exception as e:
-            return False, f"Error updating father info: {str(e)}"
-
-    def update_mother_info(self, national_id: str, mother_data: Dict) -> Tuple[bool, str]:
-        """Update mother's medical information"""
-        try:
-            family_history = self.get_family_history(national_id) or {}
-            family_history['mother'] = mother_data
-
-            return self.update_family_history(national_id, family_history)
-        except Exception as e:
-            return False, f"Error updating mother info: {str(e)}"
-
-    def add_sibling(self, national_id: str, sibling_data: Dict) -> Tuple[bool, str]:
-        """Add sibling to family history"""
-        try:
-            family_history = self.get_family_history(national_id) or {}
-
-            if 'siblings' not in family_history:
-                family_history['siblings'] = []
-
-            family_history['siblings'].append(sibling_data)
-
-            return self.update_family_history(national_id, family_history)
-        except Exception as e:
-            return False, f"Error adding sibling: {str(e)}"
-
-    def remove_sibling(self, national_id: str, sibling_index: int) -> Tuple[bool, str]:
-        """Remove sibling from family history"""
-        try:
-            family_history = self.get_family_history(national_id) or {}
-
-            if 'siblings' not in family_history:
-                return False, "No siblings found"
-
-            siblings = family_history['siblings']
-
-            if sibling_index < 0 or sibling_index >= len(siblings):
-                return False, "Invalid sibling index"
-
-            del siblings[sibling_index]
-            family_history['siblings'] = siblings
-
-            return self.update_family_history(national_id, family_history)
-        except Exception as e:
-            return False, f"Error removing sibling: {str(e)}"
-
-    def update_genetic_conditions(self, national_id: str, genetic_conditions: list) -> Tuple[bool, str]:
-        """Update genetic conditions list"""
-        try:
-            family_history = self.get_family_history(national_id) or {}
-            family_history['genetic_conditions'] = genetic_conditions
-
-            return self.update_family_history(national_id, family_history)
-        except Exception as e:
-            return False, f"Error updating genetic conditions: {str(e)}"
-
-    def get_genetic_risk_summary(self, national_id: str) -> Dict:
-        """
-        Get summary of genetic risk factors from family history
-
-        Args:
-            national_id: Patient's national ID
-
-        Returns:
-            Dictionary with risk factors and summary
-        """
-        family_history = self.get_family_history(national_id)
-
-        if not family_history:
-            return {'risk_factors': [], 'high_risk_conditions': []}
-
-        risk_factors = []
-
-        # Check genetic conditions
-        genetic_conditions = family_history.get('genetic_conditions', [])
-        risk_factors.extend(genetic_conditions)
-
-        # Check father's conditions
-        if 'father' in family_history and family_history['father'].get('medical_conditions'):
-            for condition in family_history['father']['medical_conditions']:
-                risk_factors.append(f"Paternal history of {condition}")
-
-        # Check mother's conditions
-        if 'mother' in family_history and family_history['mother'].get('medical_conditions'):
-            for condition in family_history['mother']['medical_conditions']:
-                risk_factors.append(f"Maternal history of {condition}")
-
-        # Identify high-risk conditions
-        high_risk_keywords = ['cancer', 'diabetes', 'heart', 'cardiovascular',
-                              'hypertension', 'stroke', 'alzheimer']
-        high_risk_conditions = []
-
-        for factor in risk_factors:
-            for keyword in high_risk_keywords:
-                if keyword.lower() in factor.lower():
-                    high_risk_conditions.append(factor)
-                    break
-
-        return {
-            'risk_factors': risk_factors,
-            'high_risk_conditions': high_risk_conditions,
-            'total_risk_factors': len(risk_factors)
-        }
-
-    def check_hereditary_condition(self, national_id: str, condition: str) -> Dict:
-        """
-        Check if a specific condition runs in the family
-
-        Returns:
-            Dictionary with information about hereditary pattern
-        """
-        family_history = self.get_family_history(national_id)
-
-        if not family_history:
+            db.add(family_member)
+            db.commit()
+            db.refresh(family_member)
+            
+            return {'success': True, 'family_member': family_member, 'message': 'Family member added'}
+    
+    def get_family_history(self, national_id):
+        """Get all family history for patient"""
+        with get_db() as db:
+            return db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id
+            ).order_by(FamilyHistory.relation).all()
+    
+    def get_family_member(self, family_id):
+        """Get specific family member by ID"""
+        with get_db() as db:
+            return db.query(FamilyHistory).filter(FamilyHistory.id == family_id).first()
+    
+    def update_family_member(self, family_id, update_data):
+        """Update family member information"""
+        with get_db() as db:
+            family_member = db.query(FamilyHistory).filter(
+                FamilyHistory.id == family_id
+            ).first()
+            
+            if not family_member:
+                return {'success': False, 'message': 'Family member not found'}
+            
+            for key, value in update_data.items():
+                if hasattr(family_member, key):
+                    setattr(family_member, key, value)
+            
+            db.commit()
+            db.refresh(family_member)
+            
+            return {'success': True, 'family_member': family_member, 'message': 'Family member updated'}
+    
+    def delete_family_member(self, family_id):
+        """Delete family member record"""
+        with get_db() as db:
+            family_member = db.query(FamilyHistory).filter(
+                FamilyHistory.id == family_id
+            ).first()
+            
+            if family_member:
+                db.delete(family_member)
+                db.commit()
+                return {'success': True, 'message': 'Family member deleted'}
+            
+            return {'success': False, 'message': 'Family member not found'}
+    
+    def add_medical_condition(self, family_id, condition):
+        """Add medical condition to family member"""
+        with get_db() as db:
+            family_member = db.query(FamilyHistory).filter(
+                FamilyHistory.id == family_id
+            ).first()
+            
+            if not family_member:
+                return {'success': False, 'message': 'Family member not found'}
+            
+            conditions = family_member.medical_conditions or []
+            
+            if condition not in conditions:
+                conditions.append(condition)
+                family_member.medical_conditions = conditions
+                db.commit()
+                
+                return {'success': True, 'message': 'Medical condition added'}
+            
+            return {'success': False, 'message': 'Condition already exists'}
+    
+    def remove_medical_condition(self, family_id, condition):
+        """Remove medical condition from family member"""
+        with get_db() as db:
+            family_member = db.query(FamilyHistory).filter(
+                FamilyHistory.id == family_id
+            ).first()
+            
+            if not family_member:
+                return {'success': False, 'message': 'Family member not found'}
+            
+            conditions = family_member.medical_conditions or []
+            
+            if condition in conditions:
+                conditions.remove(condition)
+                family_member.medical_conditions = conditions
+                db.commit()
+                
+                return {'success': True, 'message': 'Medical condition removed'}
+            
+            return {'success': False, 'message': 'Condition not found'}
+    
+    def get_family_by_relation(self, national_id, relation):
+        """Get family members by relation (e.g., all siblings)"""
+        with get_db() as db:
+            return db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id,
+                FamilyHistory.relation == relation
+            ).all()
+    
+    def get_living_family_members(self, national_id):
+        """Get all living family members"""
+        with get_db() as db:
+            return db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id,
+                FamilyHistory.is_alive == True
+            ).all()
+    
+    def get_deceased_family_members(self, national_id):
+        """Get all deceased family members"""
+        with get_db() as db:
+            return db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id,
+                FamilyHistory.is_alive == False
+            ).all()
+    
+    def search_by_condition(self, national_id, condition):
+        """Search family history for specific medical condition"""
+        with get_db() as db:
+            family_members = db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id
+            ).all()
+            
+            # Filter by condition in medical_conditions JSON
+            matching = []
+            for member in family_members:
+                if member.medical_conditions:
+                    if any(condition.lower() in c.lower() for c in member.medical_conditions):
+                        matching.append(member)
+            
+            return matching
+    
+    def get_genetic_risk_factors(self, national_id):
+        """Analyze family history for genetic risk factors"""
+        with get_db() as db:
+            family_members = db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id
+            ).all()
+            
+            # Common genetic conditions to track
+            genetic_conditions = [
+                'diabetes', 'heart disease', 'cancer', 'hypertension',
+                'stroke', 'alzheimer', 'parkinson', 'asthma'
+            ]
+            
+            risk_factors = {}
+            
+            for condition in genetic_conditions:
+                count = 0
+                affected_relatives = []
+                
+                for member in family_members:
+                    if member.medical_conditions:
+                        for med_cond in member.medical_conditions:
+                            if condition.lower() in med_cond.lower():
+                                count += 1
+                                affected_relatives.append(member.relation)
+                
+                if count > 0:
+                    risk_factors[condition] = {
+                        'count': count,
+                        'relatives': affected_relatives,
+                        'risk_level': 'High' if count >= 2 else 'Moderate'
+                    }
+            
+            return risk_factors
+    
+    def get_family_summary(self, national_id):
+        """Get summary of family medical history"""
+        with get_db() as db:
+            family_members = db.query(FamilyHistory).filter(
+                FamilyHistory.patient_national_id == national_id
+            ).all()
+            
+            # Collect all unique conditions
+            all_conditions = set()
+            for member in family_members:
+                if member.medical_conditions:
+                    all_conditions.update(member.medical_conditions)
+            
             return {
-                'found': False,
-                'affected_relatives': []
+                'total_members': len(family_members),
+                'living_members': len([m for m in family_members if m.is_alive]),
+                'deceased_members': len([m for m in family_members if not m.is_alive]),
+                'unique_conditions': list(all_conditions),
+                'relations': list(set([m.relation for m in family_members]))
             }
-
-        affected_relatives = []
-        condition_lower = condition.lower()
-
-        # Check father
-        if 'father' in family_history:
-            father = family_history['father']
-            for cond in father.get('medical_conditions', []):
-                if condition_lower in cond.lower():
-                    affected_relatives.append('Father')
-                    break
-
-        # Check mother
-        if 'mother' in family_history:
-            mother = family_history['mother']
-            for cond in mother.get('medical_conditions', []):
-                if condition_lower in cond.lower():
-                    affected_relatives.append('Mother')
-                    break
-
-        # Check siblings
-        if 'siblings' in family_history:
-            for i, sibling in enumerate(family_history['siblings'], 1):
-                for cond in sibling.get('medical_conditions', []):
-                    if condition_lower in cond.lower():
-                        affected_relatives.append(
-                            f"{sibling.get('relation', 'Sibling')} {i}")
-                        break
-
-        return {
-            'found': len(affected_relatives) > 0,
-            'affected_relatives': affected_relatives,
-            'count': len(affected_relatives)
-        }
-
 
 # Global instance
 family_history_manager = FamilyHistoryManager()
