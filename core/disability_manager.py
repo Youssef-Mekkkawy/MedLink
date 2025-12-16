@@ -1,261 +1,250 @@
 """
-Disability manager - Handle patient disability and special needs
-Location: core/disability_manager.py
+Disability Manager - Manage Patient Disabilities
+MySQL Version - Compatible with existing GUI
 """
-from typing import Dict, Optional, Tuple
-from core.data_manager import data_manager
-from utils.date_utils import get_current_datetime
-from utils.enhanced_validators import validate_disability_data
 
+from datetime import datetime
+from core.database import get_db
+from core.models import Disability, Patient
 
 class DisabilityManager:
-    """Manages patient disability and special needs information"""
-
+    """Manage patient disability information"""
+    
     def __init__(self):
-        self.data_manager = data_manager
-
-    def get_disability_info(self, national_id: str) -> Optional[Dict]:
+        pass
+    
+    def get_disability(self, national_id):
+        """Get disability information for patient"""
+        with get_db() as db:
+            return db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+    
+    def has_disability(self, national_id):
+        """Check if patient has disability record"""
+        disability = self.get_disability(national_id)
+        return disability and disability.has_disability
+    
+    def create_disability_record(self, national_id, disability_data):
         """
-        Get disability information for a patient
-
-        Args:
-            national_id: Patient's national ID
-
-        Returns:
-            Disability information dictionary or None
+        Create disability record for patient
+        
+        disability_data should contain:
+        - has_disability: bool
+        - disability_type: str (optional)
+        - mobility_aids: list (optional)
+        - hearing_impairment: bool
+        - visual_impairment: bool
+        - cognitive_impairment: bool
+        - communication_needs: list (optional)
+        - accessibility_requirements: list (optional)
+        - notes: str (optional)
         """
-        # Get patient data
-        patient = self.data_manager.find_item(
-            'patients', 'patients', 'national_id', national_id)
-
-        if not patient:
-            return None
-
-        return patient.get('disabilities_special_needs', {})
-
-    def update_disability_info(self, national_id: str, disability_data: Dict) -> Tuple[bool, str]:
-        """
-        Update complete disability and special needs information
-
-        Args:
-            national_id: Patient's national ID
-            disability_data: Complete disability information dictionary
-
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Validate disability data
-            valid, msg = validate_disability_data(disability_data)
-            if not valid:
-                return False, f"Validation error: {msg}"
-
-            # Get patient
-            patient = self.data_manager.find_item(
-                'patients', 'patients', 'national_id', national_id)
-
+        with get_db() as db:
+            # Check if patient exists
+            patient = db.query(Patient).filter(
+                Patient.national_id == national_id
+            ).first()
+            
             if not patient:
-                return False, "Patient not found"
-
-            # Add timestamp
-            disability_data['last_updated'] = get_current_datetime()
-
-            # Update disability information
-            patient['disabilities_special_needs'] = disability_data
-
-            # Update patient in database
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
+                return {'success': False, 'message': 'Patient not found'}
+            
+            # Check if disability record already exists
+            existing = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if existing:
+                return {'success': False, 'message': 'Disability record already exists'}
+            
+            disability = Disability(
+                patient_national_id=national_id,
+                **disability_data
             )
-
-            if success:
-                return True, "Disability information updated successfully"
-            else:
-                return False, "Failed to update disability information"
-
-        except Exception as e:
-            return False, f"Error updating disability info: {str(e)}"
-
-    def set_has_disability(self, national_id: str, has_disability: bool) -> Tuple[bool, str]:
-        """Update whether patient has a disability"""
-        try:
-            disability_info = self.get_disability_info(national_id) or {}
-            disability_info['has_disability'] = has_disability
-
-            # If setting to False, clear disability-specific fields
-            if not has_disability:
-                disability_info['disability_type'] = None
-                disability_info['mobility_aids'] = []
-                disability_info['hearing_impairment'] = False
-                disability_info['visual_impairment'] = False
-                disability_info['cognitive_impairment'] = False
-                disability_info['communication_needs'] = []
-                disability_info['accessibility_requirements'] = []
-                disability_info['notes'] = None
-
-            return self.update_disability_info(national_id, disability_info)
-        except Exception as e:
-            return False, f"Error setting disability status: {str(e)}"
-
-    def add_mobility_aid(self, national_id: str, aid: str) -> Tuple[bool, str]:
-        """Add mobility aid to patient's profile"""
-        try:
-            disability_info = self.get_disability_info(national_id) or {}
-
-            if not disability_info.get('has_disability'):
-                return False, "Patient must be marked as having a disability first"
-
-            if 'mobility_aids' not in disability_info:
-                disability_info['mobility_aids'] = []
-
-            if aid not in disability_info['mobility_aids']:
-                disability_info['mobility_aids'].append(aid)
-
-            return self.update_disability_info(national_id, disability_info)
-        except Exception as e:
-            return False, f"Error adding mobility aid: {str(e)}"
-
-    def remove_mobility_aid(self, national_id: str, aid: str) -> Tuple[bool, str]:
-        """Remove mobility aid from patient's profile"""
-        try:
-            disability_info = self.get_disability_info(national_id) or {}
-
-            if 'mobility_aids' in disability_info and aid in disability_info['mobility_aids']:
-                disability_info['mobility_aids'].remove(aid)
-                return self.update_disability_info(national_id, disability_info)
-
-            return False, "Mobility aid not found"
-        except Exception as e:
-            return False, f"Error removing mobility aid: {str(e)}"
-
-    def add_communication_need(self, national_id: str, need: str) -> Tuple[bool, str]:
-        """Add communication need to patient's profile"""
-        try:
-            disability_info = self.get_disability_info(national_id) or {}
-
-            if not disability_info.get('has_disability'):
-                return False, "Patient must be marked as having a disability first"
-
-            if 'communication_needs' not in disability_info:
-                disability_info['communication_needs'] = []
-
-            if need not in disability_info['communication_needs']:
-                disability_info['communication_needs'].append(need)
-
-            return self.update_disability_info(national_id, disability_info)
-        except Exception as e:
-            return False, f"Error adding communication need: {str(e)}"
-
-    def add_accessibility_requirement(self, national_id: str, requirement: str) -> Tuple[bool, str]:
-        """Add accessibility requirement to patient's profile"""
-        try:
-            disability_info = self.get_disability_info(national_id) or {}
-
-            if not disability_info.get('has_disability'):
-                return False, "Patient must be marked as having a disability first"
-
-            if 'accessibility_requirements' not in disability_info:
-                disability_info['accessibility_requirements'] = []
-
-            if requirement not in disability_info['accessibility_requirements']:
-                disability_info['accessibility_requirements'].append(
-                    requirement)
-
-            return self.update_disability_info(national_id, disability_info)
-        except Exception as e:
-            return False, f"Error adding accessibility requirement: {str(e)}"
-
-    def get_accessibility_summary(self, national_id: str) -> Dict:
-        """
-        Get accessibility requirements summary
-
-        Args:
-            national_id: Patient's national ID
-
-        Returns:
-            Dictionary with accessibility summary
-        """
-        disability_info = self.get_disability_info(national_id)
-
-        if not disability_info or not disability_info.get('has_disability'):
+            db.add(disability)
+            db.commit()
+            db.refresh(disability)
+            
+            return {'success': True, 'disability': disability, 'message': 'Disability record created'}
+    
+    def update_disability(self, national_id, update_data):
+        """Update disability information"""
+        with get_db() as db:
+            disability = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if not disability:
+                # Create new record if doesn't exist
+                return self.create_disability_record(national_id, update_data)
+            
+            # Update existing record
+            for key, value in update_data.items():
+                if hasattr(disability, key):
+                    setattr(disability, key, value)
+            
+            disability.updated_at = datetime.now()
+            db.commit()
+            db.refresh(disability)
+            
+            return {'success': True, 'disability': disability, 'message': 'Disability record updated'}
+    
+    def delete_disability(self, national_id):
+        """Delete disability record"""
+        with get_db() as db:
+            disability = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if disability:
+                db.delete(disability)
+                db.commit()
+                return {'success': True, 'message': 'Disability record deleted'}
+            
+            return {'success': False, 'message': 'Disability record not found'}
+    
+    def add_mobility_aid(self, national_id, mobility_aid):
+        """Add mobility aid to patient's record"""
+        with get_db() as db:
+            disability = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if not disability:
+                return {'success': False, 'message': 'Disability record not found'}
+            
+            # Get existing mobility aids
+            mobility_aids = disability.mobility_aids or []
+            
+            if mobility_aid not in mobility_aids:
+                mobility_aids.append(mobility_aid)
+                disability.mobility_aids = mobility_aids
+                db.commit()
+                
+                return {'success': True, 'message': 'Mobility aid added'}
+            
+            return {'success': False, 'message': 'Mobility aid already exists'}
+    
+    def remove_mobility_aid(self, national_id, mobility_aid):
+        """Remove mobility aid from patient's record"""
+        with get_db() as db:
+            disability = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if not disability:
+                return {'success': False, 'message': 'Disability record not found'}
+            
+            mobility_aids = disability.mobility_aids or []
+            
+            if mobility_aid in mobility_aids:
+                mobility_aids.remove(mobility_aid)
+                disability.mobility_aids = mobility_aids
+                db.commit()
+                
+                return {'success': True, 'message': 'Mobility aid removed'}
+            
+            return {'success': False, 'message': 'Mobility aid not found'}
+    
+    def add_communication_need(self, national_id, need):
+        """Add communication need"""
+        with get_db() as db:
+            disability = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if not disability:
+                return {'success': False, 'message': 'Disability record not found'}
+            
+            needs = disability.communication_needs or []
+            
+            if need not in needs:
+                needs.append(need)
+                disability.communication_needs = needs
+                db.commit()
+                
+                return {'success': True, 'message': 'Communication need added'}
+            
+            return {'success': False, 'message': 'Communication need already exists'}
+    
+    def add_accessibility_requirement(self, national_id, requirement):
+        """Add accessibility requirement"""
+        with get_db() as db:
+            disability = db.query(Disability).filter(
+                Disability.patient_national_id == national_id
+            ).first()
+            
+            if not disability:
+                return {'success': False, 'message': 'Disability record not found'}
+            
+            requirements = disability.accessibility_requirements or []
+            
+            if requirement not in requirements:
+                requirements.append(requirement)
+                disability.accessibility_requirements = requirements
+                db.commit()
+                
+                return {'success': True, 'message': 'Accessibility requirement added'}
+            
+            return {'success': False, 'message': 'Requirement already exists'}
+    
+    def get_patients_with_disabilities(self):
+        """Get all patients with disabilities"""
+        with get_db() as db:
+            disabilities = db.query(Disability).filter(
+                Disability.has_disability == True
+            ).all()
+            
+            return disabilities
+    
+    def get_patients_by_disability_type(self, disability_type):
+        """Get patients by specific disability type"""
+        with get_db() as db:
+            disabilities = db.query(Disability).filter(
+                Disability.has_disability == True,
+                Disability.disability_type.like(f"%{disability_type}%")
+            ).all()
+            
+            return disabilities
+    
+    def get_patients_with_mobility_aids(self):
+        """Get patients who use mobility aids"""
+        with get_db() as db:
+            disabilities = db.query(Disability).filter(
+                Disability.has_disability == True,
+                Disability.mobility_aids.isnot(None)
+            ).all()
+            
+            return disabilities
+    
+    def get_disability_statistics(self):
+        """Get disability statistics"""
+        with get_db() as db:
+            total_patients = db.query(Patient).count()
+            patients_with_disabilities = db.query(Disability).filter(
+                Disability.has_disability == True
+            ).count()
+            
+            hearing_impaired = db.query(Disability).filter(
+                Disability.hearing_impairment == True
+            ).count()
+            
+            visual_impaired = db.query(Disability).filter(
+                Disability.visual_impairment == True
+            ).count()
+            
+            cognitive_impaired = db.query(Disability).filter(
+                Disability.cognitive_impairment == True
+            ).count()
+            
             return {
-                'has_disability': False,
-                'summary': []
+                'total_patients': total_patients,
+                'patients_with_disabilities': patients_with_disabilities,
+                'percentage': (patients_with_disabilities / total_patients * 100) if total_patients > 0 else 0,
+                'hearing_impaired': hearing_impaired,
+                'visual_impaired': visual_impaired,
+                'cognitive_impaired': cognitive_impaired
             }
-
-        summary = []
-
-        # Mobility aids
-        if disability_info.get('mobility_aids'):
-            aids = ', '.join(disability_info['mobility_aids'])
-            summary.append(f"Uses mobility aids: {aids}")
-
-        # Impairments
-        if disability_info.get('hearing_impairment'):
-            summary.append("Hearing impairment")
-        if disability_info.get('visual_impairment'):
-            summary.append("Visual impairment")
-        if disability_info.get('cognitive_impairment'):
-            summary.append("Cognitive impairment")
-
-        # Communication needs
-        if disability_info.get('communication_needs'):
-            needs = ', '.join(disability_info['communication_needs'])
-            summary.append(f"Communication support: {needs}")
-
-        # Accessibility requirements
-        if disability_info.get('accessibility_requirements'):
-            reqs = ', '.join(disability_info['accessibility_requirements'])
-            summary.append(f"Requires: {reqs}")
-
-        return {
-            'has_disability': True,
-            'disability_type': disability_info.get('disability_type'),
-            'needs_accommodations': len(summary) > 0,
-            'summary': summary,
-            'mobility_aids': disability_info.get('mobility_aids', []),
-            'communication_needs': disability_info.get('communication_needs', []),
-            'accessibility_requirements': disability_info.get('accessibility_requirements', [])
-        }
-
-    def check_special_requirements(self, national_id: str) -> Dict:
-        """
-        Check if patient has any special requirements for medical care
-
-        Returns:
-            Dictionary with flags for various special needs
-        """
-        disability_info = self.get_disability_info(national_id)
-
-        if not disability_info or not disability_info.get('has_disability'):
-            return {
-                'has_special_needs': False,
-                'requires_wheelchair_access': False,
-                'requires_interpreter': False,
-                'requires_assistance': False,
-                'has_communication_barrier': False
-            }
-
-        mobility_aids = disability_info.get('mobility_aids', [])
-        communication_needs = disability_info.get('communication_needs', [])
-
-        return {
-            'has_special_needs': True,
-            'requires_wheelchair_access': 'Wheelchair' in mobility_aids,
-            'requires_interpreter': any('interpreter' in need.lower() for need in communication_needs),
-            'requires_assistance': len(mobility_aids) > 0,
-            'has_communication_barrier': (
-                disability_info.get('hearing_impairment', False) or
-                len(communication_needs) > 0
-            ),
-            'has_visual_impairment': disability_info.get('visual_impairment', False),
-            'has_cognitive_impairment': disability_info.get('cognitive_impairment', False)
-        }
-
 
 # Global instance
 disability_manager = DisabilityManager()

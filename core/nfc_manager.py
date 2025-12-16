@@ -1,266 +1,246 @@
 """
-NFC card manager for R20C reader
+Card Manager - NFC Card Management
+MySQL Version - Compatible with existing GUI
 """
-import serial
-from typing import Optional, Tuple
-from config.hardware_config import NFC_CONFIG
-from core.data_manager import data_manager
-from core.patient_manager import patient_manager
-from utils.logger import log_hardware_event
-from datetime import datetime
 
+from datetime import datetime, date
+from core.database import get_db
+from core.models import NFCCard, Patient, Doctor, User
 
-class NFCManager:
-    """Manages R20C NFC card reader operations"""
+class CardManager:
+    """Manage NFC cards for patients and doctors"""
     
     def __init__(self):
-        self.port = NFC_CONFIG['port']
-        self.baudrate = NFC_CONFIG['baudrate']
-        self.ser = None
-        self.is_connected = False
+        pass
     
-    def connect(self) -> Tuple[bool, str]:
+    def register_card(self, card_uid, card_type, linked_to, name, **kwargs):
         """
-        Connect to R20C NFC reader
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            self.ser = serial.Serial(
-                port=self.port,
-                baudrate=self.baudrate,
-                timeout=NFC_CONFIG['timeout']
-            )
-            
-            self.is_connected = True
-            return True, "NFC reader connected successfully"
-            
-        except serial.SerialException as e:
-            return False, f"Connection error: {str(e)}"
-    
-    def disconnect(self):
-        """Disconnect from reader"""
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-        self.is_connected = False
-    
-    def read_card_uid(self, timeout: int = 30) -> Tuple[bool, Optional[str], str]:
-        """
-        Read UID from NFC card/tag
+        Register new NFC card
         
         Args:
-            timeout: Seconds to wait for card tap
-            
-        Returns:
-            (success: bool, uid: str or None, message: str)
+            card_uid: Card UID from scanner
+            card_type: 'doctor' or 'patient'
+            linked_to: user_id or national_id
+            name: Full name
         """
-        if not self.is_connected:
-            success, msg = self.connect()
-            if not success:
-                return False, None, msg
-        
-        try:
-            import time
-            start_time = time.time()
-            
-            print(f"Waiting for NFC card... ({timeout}s timeout)")
-            
-            while time.time() - start_time < timeout:
-                if self.ser.in_waiting > 0:
-                    data = self.ser.readline()
-                    
-                    if data:
-                        # Parse UID (format depends on R20C configuration)
-                        uid = data.decode('utf-8').strip()
-                        
-                        # Validate UID format
-                        if self._is_valid_uid(uid):
-                            print(f"✅ Card detected: {uid}")
-                            return True, uid, "Card read successfully"
-                
-                time.sleep(0.1)
-            
-            return False, None, "Timeout - No card detected"
-            
-        except Exception as e:
-            return False, None, f"Read error: {str(e)}"
-    
-    def assign_card_to_patient(self, national_id: str, card_type: str = "Mifare Classic 1K") -> Tuple[bool, str]:
-        """
-        Assign NFC card to patient
-        
-        Args:
-            national_id: Patient's National ID
-            card_type: Type of NFC card
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Read card UID
-            success, uid, msg = self.read_card_uid(timeout=30)
-            
-            if not success:
-                return False, msg
-            
-            # Check if card already assigned
-            existing = self._find_patient_by_card(uid)
+        with get_db() as db:
+            # Check if card already exists
+            existing = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
             if existing:
-                return False, f"Card already assigned to {existing.get('full_name')}"
+                return {'success': False, 'message': 'Card already registered'}
             
+            card = NFCCard(
+                card_uid=card_uid,
+                card_type=card_type,
+                linked_to=linked_to,
+                name=name,
+                is_active=True,
+                assigned_date=date.today(),
+                **kwargs
+            )
+            db.add(card)
+            db.commit()
+            db.refresh(card)
+            
+            return {'success': True, 'card': card, 'message': 'Card registered successfully'}
+    
+    def get_card(self, card_uid):
+        """Get card by UID"""
+        with get_db() as db:
+            return db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
+    
+    def get_card_by_user(self, linked_to):
+        """Get card by linked user/patient"""
+        with get_db() as db:
+            return db.query(NFCCard).filter(
+                NFCCard.linked_to == linked_to,
+                NFCCard.is_active == True
+            ).first()
+    
+    def authenticate_card(self, card_uid):
+        """
+        Authenticate user by NFC card
+        Returns: dict with success, card_type, user_info
+        """
+        with get_db() as db:
+            card = db.query(NFCCard).filter(
+                NFCCard.card_uid == card_uid,
+                NFCCard.is_active == True
+            ).first()
+            
+            if not card:
+                return {'success': False, 'message': 'Card not found or inactive'}
+            
+            # Update scan info
+            card.last_scan = datetime.now()
+            card.scan_count += 1
+            db.commit()
+            
+            # Get user info based on card type
+            if card.card_type == 'doctor':
+                user = db.query(User).filter(User.user_id == card.linked_to).first()
+                if user:
+                    return {
+                        'success': True,
+                        'card_type': 'doctor',
+                        'user_id': user.user_id,
+                        'username': user.username,
+                        'full_name': user.full_name,
+                        'role': user.role
+                    }
+            
+            elif card.card_type == 'patient':
+                patient = db.query(Patient).filter(
+                    Patient.national_id == card.linked_to
+                ).first()
+                if patient:
+                    return {
+                        'success': True,
+                        'card_type': 'patient',
+                        'national_id': patient.national_id,
+                        'full_name': patient.full_name,
+                        'blood_type': patient.blood_type,
+                        'age': patient.age
+                    }
+            
+            return {'success': False, 'message': 'User not found'}
+    
+    def update_card(self, card_uid, update_data):
+        """Update card information"""
+        with get_db() as db:
+            card = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
+            
+            if card:
+                for key, value in update_data.items():
+                    if hasattr(card, key):
+                        setattr(card, key, value)
+                
+                db.commit()
+                return {'success': True, 'message': 'Card updated'}
+            
+            return {'success': False, 'message': 'Card not found'}
+    
+    def deactivate_card(self, card_uid):
+        """Deactivate card (lost/stolen)"""
+        with get_db() as db:
+            card = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
+            
+            if card:
+                card.is_active = False
+                db.commit()
+                return {'success': True, 'message': 'Card deactivated'}
+            
+            return {'success': False, 'message': 'Card not found'}
+    
+    def activate_card(self, card_uid):
+        """Reactivate card"""
+        with get_db() as db:
+            card = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
+            
+            if card:
+                card.is_active = True
+                db.commit()
+                return {'success': True, 'message': 'Card activated'}
+            
+            return {'success': False, 'message': 'Card not found'}
+    
+    def get_all_cards(self, card_type=None, active_only=True):
+        """Get all cards, optionally filtered"""
+        with get_db() as db:
+            query = db.query(NFCCard)
+            
+            if card_type:
+                query = query.filter(NFCCard.card_type == card_type)
+            
+            if active_only:
+                query = query.filter(NFCCard.is_active == True)
+            
+            return query.order_by(NFCCard.name).all()
+    
+    def get_card_stats(self, card_uid):
+        """Get card usage statistics"""
+        with get_db() as db:
+            card = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
+            
+            if card:
+                return {
+                    'card_uid': card.card_uid,
+                    'name': card.name,
+                    'card_type': card.card_type,
+                    'is_active': card.is_active,
+                    'assigned_date': card.assigned_date,
+                    'last_scan': card.last_scan,
+                    'scan_count': card.scan_count
+                }
+            
+            return None
+    
+    def search_cards(self, search_term):
+        """Search cards by name or UID"""
+        with get_db() as db:
+            search = f"%{search_term}%"
+            return db.query(NFCCard).filter(
+                (NFCCard.name.like(search)) |
+                (NFCCard.card_uid.like(search))
+            ).all()
+    
+    def link_card_to_patient(self, card_uid, national_id):
+        """Link existing card to patient"""
+        with get_db() as db:
             # Get patient
-            patient = patient_manager.get_patient_by_id(national_id)
-            if not patient:
-                return False, "Patient not found"
-            
-            # Update patient record
-            patient['nfc_card_uid'] = uid
-            patient['nfc_card_assigned'] = True
-            patient['nfc_card_assignment_date'] = datetime.now().strftime("%Y-%m-%d")
-            patient['nfc_card_type'] = card_type
-            patient['nfc_card_status'] = 'active'
-            
-            patient_manager.update_patient(national_id, patient)
-            
-            # Log event
-            log_hardware_event(
-                event_type='nfc_card_assignment',
-                patient_national_id=national_id,
-                card_uid=uid,
-                success=True
-            )
-            
-            return True, f"Card {uid} assigned successfully to {patient.get('full_name')}"
-            
-        except Exception as e:
-            return False, f"Assignment error: {str(e)}"
-    
-    def get_patient_from_card(self, timeout: int = 10) -> Tuple[bool, Optional[dict], str]:
-        """
-        Read card and return patient data
-        
-        Args:
-            timeout: Seconds to wait for card
-            
-        Returns:
-            (success: bool, patient_data: dict or None, message: str)
-        """
-        try:
-            # Read card
-            success, uid, msg = self.read_card_uid(timeout)
-            
-            if not success:
-                return False, None, msg
-            
-            # Find patient
-            patient = self._find_patient_by_card(uid)
+            patient = db.query(Patient).filter(
+                Patient.national_id == national_id
+            ).first()
             
             if not patient:
-                log_hardware_event(
-                    event_type='nfc_card_scan',
-                    card_uid=uid,
-                    success=False,
-                    error='Card not assigned'
-                )
-                return False, None, "Card not assigned to any patient"
+                return {'success': False, 'message': 'Patient not found'}
             
-            # Log successful access
-            log_hardware_event(
-                event_type='nfc_card_scan',
-                patient_national_id=patient.get('national_id'),
-                card_uid=uid,
-                success=True
-            )
+            # Get card
+            card = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
             
-            return True, patient, f"Patient: {patient.get('full_name')}"
+            if not card:
+                return {'success': False, 'message': 'Card not found'}
             
-        except Exception as e:
-            return False, None, f"Error: {str(e)}"
+            # Link card
+            card.linked_to = national_id
+            card.name = patient.full_name
+            card.card_type = 'patient'
+            card.is_active = True
+            
+            # Update patient
+            patient.nfc_card_uid = card_uid
+            patient.nfc_card_assigned = True
+            patient.nfc_card_assignment_date = date.today()
+            patient.nfc_card_type = 'NFC Card'
+            patient.nfc_card_status = 'active'
+            
+            db.commit()
+            
+            return {'success': True, 'message': 'Card linked to patient'}
     
-    def unassign_card(self, national_id: str) -> Tuple[bool, str]:
-        """
-        Remove card assignment from patient
-        
-        Args:
-            national_id: Patient's National ID
+    def unlink_card(self, card_uid):
+        """Unlink card from user"""
+        with get_db() as db:
+            card = db.query(NFCCard).filter(NFCCard.card_uid == card_uid).first()
             
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            patient = patient_manager.get_patient_by_id(national_id)
-            if not patient:
-                return False, "Patient not found"
-            
-            if not patient.get('nfc_card_assigned'):
-                return False, "Patient has no assigned card"
-            
-            old_uid = patient.get('nfc_card_uid')
-            
-            # Update patient record
-            patient['nfc_card_uid'] = None
-            patient['nfc_card_assigned'] = False
-            patient['nfc_card_status'] = 'unassigned'
-            
-            patient_manager.update_patient(national_id, patient)
-            
-            # Log event
-            log_hardware_event(
-                event_type='nfc_card_unassignment',
-                patient_national_id=national_id,
-                card_uid=old_uid,
-                success=True
-            )
-            
-            return True, "Card unassigned successfully"
-            
-        except Exception as e:
-            return False, f"Unassignment error: {str(e)}"
-    
-    def mark_card_lost(self, national_id: str) -> Tuple[bool, str]:
-        """Mark card as lost (for security)"""
-        try:
-            patient = patient_manager.get_patient_by_id(national_id)
-            if patient and patient.get('nfc_card_assigned'):
-                patient['nfc_card_status'] = 'lost'
-                patient_manager.update_patient(national_id, patient)
+            if card:
+                # If patient card, update patient record
+                if card.card_type == 'patient':
+                    patient = db.query(Patient).filter(
+                        Patient.national_id == card.linked_to
+                    ).first()
+                    if patient:
+                        patient.nfc_card_uid = None
+                        patient.nfc_card_assigned = False
+                        patient.nfc_card_status = 'inactive'
                 
-                log_hardware_event(
-                    event_type='nfc_card_lost',
-                    patient_national_id=national_id,
-                    card_uid=patient.get('nfc_card_uid'),
-                    success=True
-                )
+                # Delete card
+                db.delete(card)
+                db.commit()
                 
-                return True, "Card marked as lost"
-            return False, "No assigned card found"
-        except Exception as e:
-            return False, str(e)
-    
-    # Private helpers
-    def _is_valid_uid(self, uid: str) -> bool:
-        """Validate UID format"""
-        # UID should be hexadecimal, 8-20 characters
-        if not uid:
-            return False
-        
-        try:
-            int(uid, 16)
-            return 4 <= len(uid) <= 20
-        except ValueError:
-            return False
-    
-    def _find_patient_by_card(self, uid: str) -> Optional[dict]:
-        """Find patient with given card UID"""
-        patients = patient_manager.get_all_patients()
-        
-        for patient in patients:
-            if patient.get('nfc_card_uid') == uid and patient.get('nfc_card_status') == 'active':
-                return patient
-        
-        return None
-
+                return {'success': True, 'message': 'Card unlinked'}
+            
+            return {'success': False, 'message': 'Card not found'}
 
 # Global instance
-nfc_manager = NFCManager()
+card_manager = CardManager()

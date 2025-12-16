@@ -1,225 +1,175 @@
 """
-Surgery manager - Handle patient surgery records
-Location: core/surgery_manager.py
+Surgery Manager - Manage Surgical Procedures
+MySQL Version - Compatible with existing GUI
 """
-from typing import List, Dict, Optional, Tuple
-from core.data_manager import data_manager
-from utils.date_utils import get_current_datetime
-from utils.enhanced_validators import validate_surgery_data
+
+from datetime import datetime, date
+from core.database import get_db
+from core.models import Surgery, Patient
 import uuid
 
-
 class SurgeryManager:
-    """Manages patient surgery records"""
+    """Manage patient surgeries"""
     
     def __init__(self):
-        self.data_manager = data_manager
+        pass
     
-    def get_patient_surgeries(self, national_id: str) -> List[Dict]:
+    def add_surgery(self, national_id, surgery_data):
         """
-        Get all surgeries for a patient, sorted by date (newest first)
+        Add surgery record
         
-        Args:
-            national_id: Patient's national ID
-        
-        Returns:
-            List of surgery dictionaries
+        surgery_data should contain:
+        - procedure_name: str
+        - date: date
+        - hospital: str (optional)
+        - surgeon_name: str (optional)
+        - anesthesia_type: str (optional)
+        - duration: str (optional)
+        - complications: str (optional)
+        - recovery_notes: str (optional)
+        - outcome: str ('successful', 'complicated', 'failed')
         """
-        # Get patient data
-        patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-        
-        if not patient:
-            return []
-        
-        surgeries = patient.get('surgeries', [])
-        
-        # Sort by date (newest first)
-        return sorted(surgeries, key=lambda x: x.get('date', ''), reverse=True)
-    
-    def get_surgery_by_id(self, national_id: str, surgery_id: str) -> Optional[Dict]:
-        """Get single surgery by ID"""
-        surgeries = self.get_patient_surgeries(national_id)
-        
-        for surgery in surgeries:
-            if surgery.get('surgery_id') == surgery_id:
-                return surgery
-        
-        return None
-    
-    def add_surgery(self, national_id: str, surgery_data: Dict) -> Tuple[bool, str]:
-        """
-        Add new surgery record to patient
-        
-        Args:
-            national_id: Patient's national ID
-            surgery_data: Surgery information dictionary
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Validate surgery data
-            valid, msg = validate_surgery_data(surgery_data)
-            if not valid:
-                return False, f"Validation error: {msg}"
+        with get_db() as db:
+            # Check if patient exists
+            patient = db.query(Patient).filter(
+                Patient.national_id == national_id
+            ).first()
             
-            # Generate surgery ID if not provided
+            if not patient:
+                return {'success': False, 'message': 'Patient not found'}
+            
+            # Generate surgery ID
             if 'surgery_id' not in surgery_data:
-                surgery_data['surgery_id'] = f"SRG{uuid.uuid4().hex[:8].upper()}"
+                surgery_data['surgery_id'] = f"SURG-{uuid.uuid4().hex[:12].upper()}"
             
-            # Add timestamp
-            surgery_data['created_at'] = get_current_datetime()
+            # Convert date string to date object if needed
+            if 'date' in surgery_data and isinstance(surgery_data['date'], str):
+                surgery_data['date'] = datetime.strptime(surgery_data['date'], '%Y-%m-%d').date()
             
-            # Get patient
-            patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-            
-            if not patient:
-                return False, "Patient not found"
-            
-            # Initialize surgeries list if it doesn't exist
-            if 'surgeries' not in patient:
-                patient['surgeries'] = []
-            
-            # Add surgery to patient's surgeries list
-            patient['surgeries'].append(surgery_data)
-            
-            # Update patient in database
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
+            surgery = Surgery(
+                patient_national_id=national_id,
+                **surgery_data
             )
+            db.add(surgery)
+            db.commit()
+            db.refresh(surgery)
             
-            if success:
-                return True, f"Surgery added successfully (ID: {surgery_data['surgery_id']})"
-            else:
-                return False, "Failed to save surgery"
-        
-        except Exception as e:
-            return False, f"Error adding surgery: {str(e)}"
+            return {
+                'success': True,
+                'surgery': surgery,
+                'message': 'Surgery record added'
+            }
     
-    def update_surgery(self, national_id: str, surgery_id: str, surgery_data: Dict) -> Tuple[bool, str]:
-        """
-        Update existing surgery record
-        
-        Args:
-            national_id: Patient's national ID
-            surgery_id: Surgery ID to update
-            surgery_data: Updated surgery information
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Validate surgery data
-            valid, msg = validate_surgery_data(surgery_data)
-            if not valid:
-                return False, f"Validation error: {msg}"
-            
-            # Get patient
-            patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-            
-            if not patient:
-                return False, "Patient not found"
-            
-            # Find and update surgery
-            surgeries = patient.get('surgeries', [])
-            surgery_found = False
-            
-            for i, surgery in enumerate(surgeries):
-                if surgery.get('surgery_id') == surgery_id:
-                    # Keep the original surgery_id and created_at
-                    surgery_data['surgery_id'] = surgery_id
-                    surgery_data['created_at'] = surgery.get('created_at', get_current_datetime())
-                    surgery_data['updated_at'] = get_current_datetime()
-                    
-                    surgeries[i] = surgery_data
-                    surgery_found = True
-                    break
-            
-            if not surgery_found:
-                return False, "Surgery not found"
-            
-            # Update patient
-            patient['surgeries'] = surgeries
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
-            )
-            
-            if success:
-                return True, "Surgery updated successfully"
-            else:
-                return False, "Failed to update surgery"
-        
-        except Exception as e:
-            return False, f"Error updating surgery: {str(e)}"
+    def get_surgeries(self, national_id):
+        """Get all surgeries for patient"""
+        with get_db() as db:
+            return db.query(Surgery).filter(
+                Surgery.patient_national_id == national_id
+            ).order_by(Surgery.date.desc()).all()
     
-    def delete_surgery(self, national_id: str, surgery_id: str) -> Tuple[bool, str]:
-        """
-        Delete surgery record
-        
-        Args:
-            national_id: Patient's national ID
-            surgery_id: Surgery ID to delete
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Get patient
-            patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-            
-            if not patient:
-                return False, "Patient not found"
-            
-            # Remove surgery
-            surgeries = patient.get('surgeries', [])
-            initial_count = len(surgeries)
-            
-            patient['surgeries'] = [s for s in surgeries if s.get('surgery_id') != surgery_id]
-            
-            if len(patient['surgeries']) == initial_count:
-                return False, "Surgery not found"
-            
-            # Update patient
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
-            )
-            
-            if success:
-                return True, "Surgery deleted successfully"
-            else:
-                return False, "Failed to delete surgery"
-        
-        except Exception as e:
-            return False, f"Error deleting surgery: {str(e)}"
+    def get_surgery(self, surgery_id):
+        """Get specific surgery by ID"""
+        with get_db() as db:
+            return db.query(Surgery).filter(
+                Surgery.surgery_id == surgery_id
+            ).first()
     
-    def get_surgeries_count(self, national_id: str) -> int:
-        """Get total surgery count for a patient"""
-        surgeries = self.get_patient_surgeries(national_id)
-        return len(surgeries)
+    def update_surgery(self, surgery_id, update_data):
+        """Update surgery record"""
+        with get_db() as db:
+            surgery = db.query(Surgery).filter(
+                Surgery.surgery_id == surgery_id
+            ).first()
+            
+            if not surgery:
+                return {'success': False, 'message': 'Surgery not found'}
+            
+            for key, value in update_data.items():
+                if hasattr(surgery, key):
+                    # Convert date string if needed
+                    if key == 'date' and isinstance(value, str):
+                        value = datetime.strptime(value, '%Y-%m-%d').date()
+                    setattr(surgery, key, value)
+            
+            db.commit()
+            db.refresh(surgery)
+            
+            return {'success': True, 'surgery': surgery, 'message': 'Surgery updated'}
     
-    def get_surgeries_by_procedure(self, national_id: str, procedure: str) -> List[Dict]:
-        """Get surgeries filtered by procedure type"""
-        all_surgeries = self.get_patient_surgeries(national_id)
+    def delete_surgery(self, surgery_id):
+        """Delete surgery record"""
+        with get_db() as db:
+            surgery = db.query(Surgery).filter(
+                Surgery.surgery_id == surgery_id
+            ).first()
+            
+            if surgery:
+                db.delete(surgery)
+                db.commit()
+                return {'success': True, 'message': 'Surgery deleted'}
+            
+            return {'success': False, 'message': 'Surgery not found'}
+    
+    def get_surgeries_by_procedure(self, procedure_name):
+        """Get all surgeries of a specific type"""
+        with get_db() as db:
+            return db.query(Surgery).filter(
+                Surgery.procedure_name.like(f"%{procedure_name}%")
+            ).order_by(Surgery.date.desc()).all()
+    
+    def get_surgeries_by_surgeon(self, surgeon_name):
+        """Get all surgeries by a specific surgeon"""
+        with get_db() as db:
+            return db.query(Surgery).filter(
+                Surgery.surgeon_name.like(f"%{surgeon_name}%")
+            ).order_by(Surgery.date.desc()).all()
+    
+    def get_recent_surgeries(self, national_id, limit=5):
+        """Get recent surgeries for patient"""
+        with get_db() as db:
+            return db.query(Surgery).filter(
+                Surgery.patient_national_id == national_id
+            ).order_by(Surgery.date.desc()).limit(limit).all()
+    
+    def get_surgeries_by_outcome(self, outcome):
+        """Get surgeries by outcome (successful, complicated, failed)"""
+        with get_db() as db:
+            return db.query(Surgery).filter(
+                Surgery.outcome == outcome
+            ).order_by(Surgery.date.desc()).all()
+    
+    def get_surgery_statistics(self, national_id):
+        """Get surgery statistics for patient"""
+        surgeries = self.get_surgeries(national_id)
         
-        return [s for s in all_surgeries if procedure.lower() in s.get('procedure', '').lower()]
+        if not surgeries:
+            return None
+        
+        outcomes = {}
+        for surgery in surgeries:
+            outcome = surgery.outcome or 'unknown'
+            outcomes[outcome] = outcomes.get(outcome, 0) + 1
+        
+        procedures = list(set([s.procedure_name for s in surgeries]))
+        hospitals = list(set([s.hospital for s in surgeries if s.hospital]))
+        
+        return {
+            'total_surgeries': len(surgeries),
+            'procedures': procedures,
+            'outcomes': outcomes,
+            'hospitals': hospitals,
+            'most_recent': surgeries[0] if surgeries else None
+        }
     
-    def get_recent_surgeries(self, national_id: str, limit: int = 5) -> List[Dict]:
-        """Get most recent surgeries"""
-        surgeries = self.get_patient_surgeries(national_id)
-        return surgeries[:limit]
-
+    def search_surgeries(self, search_term):
+        """Search surgeries by procedure name or surgeon"""
+        with get_db() as db:
+            search = f"%{search_term}%"
+            return db.query(Surgery).filter(
+                (Surgery.procedure_name.like(search)) |
+                (Surgery.surgeon_name.like(search)) |
+                (Surgery.hospital.like(search))
+            ).order_by(Surgery.date.desc()).all()
 
 # Global instance
 surgery_manager = SurgeryManager()

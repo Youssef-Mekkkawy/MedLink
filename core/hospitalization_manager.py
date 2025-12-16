@@ -1,233 +1,168 @@
 """
-Hospitalization manager - Handle patient hospitalization records
-Location: core/hospitalization_manager.py
+Hospitalization Manager - Manage Hospital Admissions
+MySQL Version - Compatible with existing GUI
 """
-from typing import List, Dict, Optional, Tuple
-from core.data_manager import data_manager
-from utils.date_utils import get_current_datetime
-from utils.enhanced_validators import validate_hospitalization_data
+
+from datetime import datetime, date
+from core.database import get_db
+from core.models import Hospitalization, Patient
 import uuid
 
-
 class HospitalizationManager:
-    """Manages patient hospitalization records"""
+    """Manage patient hospitalizations"""
     
     def __init__(self):
-        self.data_manager = data_manager
+        pass
     
-    def get_patient_hospitalizations(self, national_id: str) -> List[Dict]:
+    def add_hospitalization(self, national_id, hospitalization_data):
         """
-        Get all hospitalizations for a patient, sorted by admission date (newest first)
+        Add hospitalization record
         
-        Args:
-            national_id: Patient's national ID
-        
-        Returns:
-            List of hospitalization dictionaries
+        hospitalization_data should contain:
+        - admission_date: date
+        - discharge_date: date (optional if still admitted)
+        - hospital: str
+        - department: str (optional)
+        - admission_reason: str
+        - diagnosis: str (optional)
+        - treatment_summary: str (optional)
+        - discharge_notes: str (optional)
         """
-        # Get patient data
-        patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-        
-        if not patient:
-            return []
-        
-        hospitalizations = patient.get('hospitalizations', [])
-        
-        # Sort by admission date (newest first)
-        return sorted(hospitalizations, key=lambda x: x.get('admission_date', ''), reverse=True)
-    
-    def get_hospitalization_by_id(self, national_id: str, hospitalization_id: str) -> Optional[Dict]:
-        """Get single hospitalization by ID"""
-        hospitalizations = self.get_patient_hospitalizations(national_id)
-        
-        for hosp in hospitalizations:
-            if hosp.get('hospitalization_id') == hospitalization_id:
-                return hosp
-        
-        return None
-    
-    def add_hospitalization(self, national_id: str, hospitalization_data: Dict) -> Tuple[bool, str]:
-        """
-        Add new hospitalization record to patient
-        
-        Args:
-            national_id: Patient's national ID
-            hospitalization_data: Hospitalization information dictionary
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Validate hospitalization data
-            valid, msg = validate_hospitalization_data(hospitalization_data)
-            if not valid:
-                return False, f"Validation error: {msg}"
+        with get_db() as db:
+            # Check if patient exists
+            patient = db.query(Patient).filter(
+                Patient.national_id == national_id
+            ).first()
             
-            # Generate hospitalization ID if not provided
+            if not patient:
+                return {'success': False, 'message': 'Patient not found'}
+            
+            # Generate hospitalization ID
             if 'hospitalization_id' not in hospitalization_data:
-                hospitalization_data['hospitalization_id'] = f"HSP{uuid.uuid4().hex[:8].upper()}"
+                hospitalization_data['hospitalization_id'] = f"HOSP-{uuid.uuid4().hex[:12].upper()}"
             
-            # Add timestamp
-            hospitalization_data['created_at'] = get_current_datetime()
+            # Calculate days stayed if discharge date provided
+            if 'discharge_date' in hospitalization_data and hospitalization_data['discharge_date']:
+                admission = hospitalization_data['admission_date']
+                discharge = hospitalization_data['discharge_date']
+                
+                if isinstance(admission, str):
+                    admission = datetime.strptime(admission, '%Y-%m-%d').date()
+                if isinstance(discharge, str):
+                    discharge = datetime.strptime(discharge, '%Y-%m-%d').date()
+                
+                hospitalization_data['days_stayed'] = (discharge - admission).days
             
-            # Get patient
-            patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-            
-            if not patient:
-                return False, "Patient not found"
-            
-            # Initialize hospitalizations list if it doesn't exist
-            if 'hospitalizations' not in patient:
-                patient['hospitalizations'] = []
-            
-            # Add hospitalization to patient's list
-            patient['hospitalizations'].append(hospitalization_data)
-            
-            # Update patient in database
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
+            hospitalization = Hospitalization(
+                patient_national_id=national_id,
+                **hospitalization_data
             )
+            db.add(hospitalization)
+            db.commit()
+            db.refresh(hospitalization)
             
-            if success:
-                return True, f"Hospitalization added successfully (ID: {hospitalization_data['hospitalization_id']})"
-            else:
-                return False, "Failed to save hospitalization"
-        
-        except Exception as e:
-            return False, f"Error adding hospitalization: {str(e)}"
+            return {
+                'success': True,
+                'hospitalization': hospitalization,
+                'message': 'Hospitalization record added'
+            }
     
-    def update_hospitalization(self, national_id: str, hospitalization_id: str, 
-                              hospitalization_data: Dict) -> Tuple[bool, str]:
-        """
-        Update existing hospitalization record
-        
-        Args:
-            national_id: Patient's national ID
-            hospitalization_id: Hospitalization ID to update
-            hospitalization_data: Updated hospitalization information
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Validate hospitalization data
-            valid, msg = validate_hospitalization_data(hospitalization_data)
-            if not valid:
-                return False, f"Validation error: {msg}"
-            
-            # Get patient
-            patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-            
-            if not patient:
-                return False, "Patient not found"
-            
-            # Find and update hospitalization
-            hospitalizations = patient.get('hospitalizations', [])
-            hosp_found = False
-            
-            for i, hosp in enumerate(hospitalizations):
-                if hosp.get('hospitalization_id') == hospitalization_id:
-                    # Keep the original ID and created_at
-                    hospitalization_data['hospitalization_id'] = hospitalization_id
-                    hospitalization_data['created_at'] = hosp.get('created_at', get_current_datetime())
-                    hospitalization_data['updated_at'] = get_current_datetime()
-                    
-                    hospitalizations[i] = hospitalization_data
-                    hosp_found = True
-                    break
-            
-            if not hosp_found:
-                return False, "Hospitalization not found"
-            
-            # Update patient
-            patient['hospitalizations'] = hospitalizations
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
-            )
-            
-            if success:
-                return True, "Hospitalization updated successfully"
-            else:
-                return False, "Failed to update hospitalization"
-        
-        except Exception as e:
-            return False, f"Error updating hospitalization: {str(e)}"
+    def get_hospitalizations(self, national_id):
+        """Get all hospitalizations for patient"""
+        with get_db() as db:
+            return db.query(Hospitalization).filter(
+                Hospitalization.patient_national_id == national_id
+            ).order_by(Hospitalization.admission_date.desc()).all()
     
-    def delete_hospitalization(self, national_id: str, hospitalization_id: str) -> Tuple[bool, str]:
-        """
-        Delete hospitalization record
-        
-        Args:
-            national_id: Patient's national ID
-            hospitalization_id: Hospitalization ID to delete
-        
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            # Get patient
-            patient = self.data_manager.find_item('patients', 'patients', 'national_id', national_id)
-            
-            if not patient:
-                return False, "Patient not found"
-            
-            # Remove hospitalization
-            hospitalizations = patient.get('hospitalizations', [])
-            initial_count = len(hospitalizations)
-            
-            patient['hospitalizations'] = [h for h in hospitalizations 
-                                          if h.get('hospitalization_id') != hospitalization_id]
-            
-            if len(patient['hospitalizations']) == initial_count:
-                return False, "Hospitalization not found"
-            
-            # Update patient
-            success = self.data_manager.update_item(
-                'patients',
-                'patients',
-                national_id,
-                'national_id',
-                patient
-            )
-            
-            if success:
-                return True, "Hospitalization deleted successfully"
-            else:
-                return False, "Failed to delete hospitalization"
-        
-        except Exception as e:
-            return False, f"Error deleting hospitalization: {str(e)}"
+    def get_hospitalization(self, hospitalization_id):
+        """Get specific hospitalization by ID"""
+        with get_db() as db:
+            return db.query(Hospitalization).filter(
+                Hospitalization.hospitalization_id == hospitalization_id
+            ).first()
     
-    def get_hospitalizations_count(self, national_id: str) -> int:
-        """Get total hospitalization count for a patient"""
-        hospitalizations = self.get_patient_hospitalizations(national_id)
-        return len(hospitalizations)
+    def update_hospitalization(self, hospitalization_id, update_data):
+        """Update hospitalization record"""
+        with get_db() as db:
+            hosp = db.query(Hospitalization).filter(
+                Hospitalization.hospitalization_id == hospitalization_id
+            ).first()
+            
+            if not hosp:
+                return {'success': False, 'message': 'Hospitalization not found'}
+            
+            for key, value in update_data.items():
+                if hasattr(hosp, key):
+                    setattr(hosp, key, value)
+            
+            # Recalculate days stayed if dates changed
+            if hosp.admission_date and hosp.discharge_date:
+                hosp.days_stayed = (hosp.discharge_date - hosp.admission_date).days
+            
+            db.commit()
+            db.refresh(hosp)
+            
+            return {'success': True, 'hospitalization': hosp, 'message': 'Record updated'}
     
-    def calculate_length_of_stay(self, hospitalization: Dict) -> Optional[int]:
-        """Calculate length of stay in days"""
-        try:
-            from datetime import datetime
+    def delete_hospitalization(self, hospitalization_id):
+        """Delete hospitalization record"""
+        with get_db() as db:
+            hosp = db.query(Hospitalization).filter(
+                Hospitalization.hospitalization_id == hospitalization_id
+            ).first()
             
-            admission = datetime.strptime(hospitalization['admission_date'], "%Y-%m-%d")
-            discharge = datetime.strptime(hospitalization['discharge_date'], "%Y-%m-%d")
+            if hosp:
+                db.delete(hosp)
+                db.commit()
+                return {'success': True, 'message': 'Hospitalization deleted'}
             
-            return (discharge - admission).days
-        except:
+            return {'success': False, 'message': 'Hospitalization not found'}
+    
+    def get_current_hospitalizations(self):
+        """Get all currently admitted patients"""
+        with get_db() as db:
+            return db.query(Hospitalization).filter(
+                Hospitalization.discharge_date.is_(None)
+            ).order_by(Hospitalization.admission_date.desc()).all()
+    
+    def discharge_patient(self, hospitalization_id, discharge_date, discharge_notes):
+        """Discharge patient from hospital"""
+        with get_db() as db:
+            hosp = db.query(Hospitalization).filter(
+                Hospitalization.hospitalization_id == hospitalization_id
+            ).first()
+            
+            if not hosp:
+                return {'success': False, 'message': 'Hospitalization not found'}
+            
+            if isinstance(discharge_date, str):
+                discharge_date = datetime.strptime(discharge_date, '%Y-%m-%d').date()
+            
+            hosp.discharge_date = discharge_date
+            hosp.discharge_notes = discharge_notes
+            hosp.days_stayed = (discharge_date - hosp.admission_date).days
+            
+            db.commit()
+            
+            return {'success': True, 'message': 'Patient discharged'}
+    
+    def get_hospitalization_statistics(self, national_id):
+        """Get hospitalization statistics for patient"""
+        hosps = self.get_hospitalizations(national_id)
+        
+        if not hosps:
             return None
-    
-    def get_recent_hospitalizations(self, national_id: str, limit: int = 5) -> List[Dict]:
-        """Get most recent hospitalizations"""
-        hospitalizations = self.get_patient_hospitalizations(national_id)
-        return hospitalizations[:limit]
-
+        
+        total_days = sum([h.days_stayed or 0 for h in hosps])
+        hospitals = list(set([h.hospital for h in hosps]))
+        
+        return {
+            'total_hospitalizations': len(hosps),
+            'total_days_hospitalized': total_days,
+            'average_stay': total_days / len(hosps) if hosps else 0,
+            'hospitals_visited': hospitals,
+            'most_recent': hosps[0] if hosps else None
+        }
 
 # Global instance
 hospitalization_manager = HospitalizationManager()
