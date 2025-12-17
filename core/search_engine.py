@@ -5,7 +5,7 @@ MySQL Version - Compatible with existing GUI
 
 from datetime import datetime, date
 from core.database import get_db
-from database.models import *
+from core.models import *
 from sqlalchemy import or_, and_
 
 class SearchEngine:

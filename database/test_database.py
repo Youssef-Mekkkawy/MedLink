@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database.connection import get_db_context, test_connection
-from database.models import User, Patient, Visit
+from core.models import User, Patient, Visit
 from datetime import date, datetime
 
 

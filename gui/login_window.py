@@ -7,7 +7,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 from gui.styles import *
 from core.auth_manager import AuthManager
-from core.card_manager import CardManager
+from core.card_manager import card_manager 
 from core.data_manager import data_manager
 from utils.validators import validate_national_id
 from config.localization import get_string as _
@@ -19,7 +19,7 @@ class LoginWindow(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.auth_manager = AuthManager()
-        self.card_manager = CardManager()
+        self.card_manager = card_manager
         # NFC card reading (background)
         self.card_buffer = ""
         self.card_reading_active = True
@@ -86,12 +86,15 @@ class LoginWindow(ctk.CTk):
                 if not card_info:
                     print("❌ Card not found")
                     return
-
+        else:
+            print("❌ Card not recognized")
+            return False
         # Check card type
+        print(card_info)
         if card_info['card_type'] == 'doctor':
             user = card_info['user']  # Full User object
             print(f"✅ Doctor: {user.full_name}")
-            self.open_doctor_dashboard(user)
+            self.open_dashboard(user)
 
         elif card_info['card_type'] == 'patient':
             patient = card_info['patient']  # Full Patient object
@@ -408,7 +411,7 @@ class LoginWindow(ctk.CTk):
 
 if __name__ == "__main__":
     # Test the card manager
-    manager = CardManager()
+    manager = card_manager()
 
     # Example 1: Get card info
     print("\n=== Example 1: Get Card Info ===")

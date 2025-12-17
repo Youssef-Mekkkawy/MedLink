@@ -1,421 +1,239 @@
 """
-Patient Manager
-Handles all patient-related operations
+FIXED Patient Manager - Works with GUI
+Location: core/patient_manager.py (REPLACE YOUR FILE)
 """
 
-from datetime import datetime, date
-from sqlalchemy import or_, and_
 from core.database import get_db
-from database.models import (
-    Patient, Allergy, ChronicDisease, CurrentMedication,
-    Surgery, Hospitalization, Vaccination, FamilyHistory,
-    Disability, EmergencyDirective, Lifestyle, Insurance,
-    Visit, LabResult, ImagingResult
-)
+from core.models import User import Patient, Surgery, Hospitalization, Vaccination, CurrentMedication
+from datetime import datetime
 
 class PatientManager:
-    """Manage patient records"""
+    """Manage patient records - COMPLETE FIX"""
     
     def get_patient(self, national_id: str):
-        """Get patient by national ID with all related data"""
-        with get_db() as db:
-            patient = db.query(Patient).filter(
-                Patient.national_id == national_id
-            ).first()
-            
-            if patient:
-                # Load all relationships
-                db.refresh(patient)
-                return patient
-            
-            return None
-    
-    def get_patient_by_id(self, patient_id: int):
-        """Get patient by database ID"""
-        with get_db() as db:
-            return db.query(Patient).filter(Patient.id == patient_id).first()
-    
-    def get_all_patients(self, limit=None):
-        """Get all patients"""
-        with get_db() as db:
-            query = db.query(Patient).order_by(Patient.full_name)
-            if limit:
-                query = query.limit(limit)
-            return query.all()
-    
-    def search_patients(self, search_term: str):
         """
-        Search patients by name, national ID, phone, or email
+        Get patient by national ID - returns dict
+        
+        Args:
+            national_id: Patient national ID
+            
+        Returns:
+            dict: Complete patient data or None
         """
-        with get_db() as db:
-            search = f"%{search_term}%"
-            patients = db.query(Patient).filter(
-                or_(
-                    Patient.full_name.like(search),
-                    Patient.national_id.like(search),
-                    Patient.phone.like(search),
-                    Patient.email.like(search)
-                )
-            ).all()
-            
-            return patients
-    
-    def create_patient(self, patient_data: dict):
-        """
-        Create new patient
-        patient_data should contain basic patient info
-        """
-        with get_db() as db:
-            # Calculate age from date_of_birth
-            if 'date_of_birth' in patient_data and isinstance(patient_data['date_of_birth'], str):
-                dob = datetime.strptime(patient_data['date_of_birth'], '%Y-%m-%d').date()
-                patient_data['date_of_birth'] = dob
-                patient_data['age'] = (date.today() - dob).days // 365
-            
-            patient = Patient(**patient_data)
-            db.add(patient)
-            db.commit()
-            db.refresh(patient)
-            
-            return patient
-    
-    def update_patient(self, national_id: str, update_data: dict):
-        """Update patient information"""
-        with get_db() as db:
-            patient = db.query(Patient).filter(
-                Patient.national_id == national_id
-            ).first()
-            
-            if patient:
-                for key, value in update_data.items():
-                    if hasattr(patient, key):
-                        setattr(patient, key, value)
-                
-                patient.last_updated = datetime.now()
-                db.commit()
-                db.refresh(patient)
-                return patient
-            
-            return None
-    
-    def delete_patient(self, national_id: str):
-        """Delete patient (use with caution!)"""
-        with get_db() as db:
-            patient = db.query(Patient).filter(
-                Patient.national_id == national_id
-            ).first()
-            
-            if patient:
-                db.delete(patient)
-                db.commit()
-                return True
-            
-            return False
-    
-    # ========================================================================
-    # ALLERGIES
-    # ========================================================================
-    
-    def add_allergy(self, national_id: str, allergen: str, **kwargs):
-        """Add allergy to patient"""
-        with get_db() as db:
-            allergy = Allergy(
-                patient_national_id=national_id,
-                allergen=allergen,
-                **kwargs
-            )
-            db.add(allergy)
-            db.commit()
-            return allergy
-    
-    def get_allergies(self, national_id: str):
-        """Get patient allergies"""
-        with get_db() as db:
-            return db.query(Allergy).filter(
-                Allergy.patient_national_id == national_id
-            ).all()
-    
-    def remove_allergy(self, allergy_id: int):
-        """Remove allergy"""
-        with get_db() as db:
-            allergy = db.query(Allergy).filter(Allergy.id == allergy_id).first()
-            if allergy:
-                db.delete(allergy)
-                db.commit()
-                return True
-            return False
-    
-    # ========================================================================
-    # CHRONIC DISEASES
-    # ========================================================================
-    
-    def add_chronic_disease(self, national_id: str, disease_name: str, **kwargs):
-        """Add chronic disease to patient"""
-        with get_db() as db:
-            disease = ChronicDisease(
-                patient_national_id=national_id,
-                disease_name=disease_name,
-                **kwargs
-            )
-            db.add(disease)
-            db.commit()
-            return disease
-    
-    def get_chronic_diseases(self, national_id: str):
-        """Get patient chronic diseases"""
-        with get_db() as db:
-            return db.query(ChronicDisease).filter(
-                ChronicDisease.patient_national_id == national_id
-            ).all()
-    
-    # ========================================================================
-    # CURRENT MEDICATIONS
-    # ========================================================================
-    
-    def add_medication(self, national_id: str, medication_data: dict):
-        """Add current medication"""
-        with get_db() as db:
-            medication = CurrentMedication(
-                patient_national_id=national_id,
-                **medication_data
-            )
-            db.add(medication)
-            db.commit()
-            return medication
-    
-    def get_current_medications(self, national_id: str):
-        """Get active medications"""
-        with get_db() as db:
-            return db.query(CurrentMedication).filter(
-                CurrentMedication.patient_national_id == national_id,
-                CurrentMedication.is_active == True
-            ).all()
-    
-    def stop_medication(self, medication_id: int, reason: str = None):
-        """Stop a medication"""
-        with get_db() as db:
-            medication = db.query(CurrentMedication).filter(
-                CurrentMedication.id == medication_id
-            ).first()
-            
-            if medication:
-                medication.is_active = False
-                medication.stopped_date = date.today()
-                medication.reason_for_stopping = reason
-                db.commit()
-                return True
-            return False
-    
-    # ========================================================================
-    # SURGERIES
-    # ========================================================================
-    
-    def add_surgery(self, national_id: str, surgery_data: dict):
-        """Add surgery record"""
-        with get_db() as db:
-            surgery = Surgery(
-                patient_national_id=national_id,
-                **surgery_data
-            )
-            db.add(surgery)
-            db.commit()
-            return surgery
-    
-    def get_surgeries(self, national_id: str):
-        """Get patient surgeries"""
-        with get_db() as db:
-            return db.query(Surgery).filter(
-                Surgery.patient_national_id == national_id
-            ).order_by(Surgery.date.desc()).all()
-    
-    # ========================================================================
-    # HOSPITALIZATIONS
-    # ========================================================================
-    
-    def add_hospitalization(self, national_id: str, hospitalization_data: dict):
-        """Add hospitalization record"""
-        with get_db() as db:
-            hosp = Hospitalization(
-                patient_national_id=national_id,
-                **hospitalization_data
-            )
-            db.add(hosp)
-            db.commit()
-            return hosp
-    
-    def get_hospitalizations(self, national_id: str):
-        """Get patient hospitalizations"""
-        with get_db() as db:
-            return db.query(Hospitalization).filter(
-                Hospitalization.patient_national_id == national_id
-            ).order_by(Hospitalization.admission_date.desc()).all()
-    
-    # ========================================================================
-    # VACCINATIONS
-    # ========================================================================
-    
-    def add_vaccination(self, national_id: str, vaccination_data: dict):
-        """Add vaccination record"""
-        with get_db() as db:
-            vaccination = Vaccination(
-                patient_national_id=national_id,
-                **vaccination_data
-            )
-            db.add(vaccination)
-            db.commit()
-            return vaccination
-    
-    def get_vaccinations(self, national_id: str):
-        """Get patient vaccinations"""
-        with get_db() as db:
-            return db.query(Vaccination).filter(
-                Vaccination.patient_national_id == national_id
-            ).order_by(Vaccination.date_administered.desc()).all()
-    
-    # ========================================================================
-    # EMERGENCY DIRECTIVES
-    # ========================================================================
-    
-    def set_emergency_directives(self, national_id: str, directives_data: dict):
-        """Set or update emergency directives"""
-        with get_db() as db:
-            directives = db.query(EmergencyDirective).filter(
-                EmergencyDirective.patient_national_id == national_id
-            ).first()
-            
-            if directives:
-                # Update existing
-                for key, value in directives_data.items():
-                    if hasattr(directives, key):
-                        setattr(directives, key, value)
-            else:
-                # Create new
-                directives = EmergencyDirective(
-                    patient_national_id=national_id,
-                    **directives_data
-                )
-                db.add(directives)
-            
-            db.commit()
-            return directives
-    
-    def get_emergency_directives(self, national_id: str):
-        """Get emergency directives"""
-        with get_db() as db:
-            return db.query(EmergencyDirective).filter(
-                EmergencyDirective.patient_national_id == national_id
-            ).first()
-    
-    # ========================================================================
-    # LIFESTYLE
-    # ========================================================================
-    
-    def set_lifestyle(self, national_id: str, lifestyle_data: dict):
-        """Set or update lifestyle information"""
-        with get_db() as db:
-            lifestyle = db.query(Lifestyle).filter(
-                Lifestyle.patient_national_id == national_id
-            ).first()
-            
-            if lifestyle:
-                # Update existing
-                for key, value in lifestyle_data.items():
-                    if hasattr(lifestyle, key):
-                        setattr(lifestyle, key, value)
-            else:
-                # Create new
-                lifestyle = Lifestyle(
-                    patient_national_id=national_id,
-                    **lifestyle_data
-                )
-                db.add(lifestyle)
-            
-            db.commit()
-            return lifestyle
-    
-    def get_lifestyle(self, national_id: str):
-        """Get lifestyle information"""
-        with get_db() as db:
-            return db.query(Lifestyle).filter(
-                Lifestyle.patient_national_id == national_id
-            ).first()
-    
-    # ========================================================================
-    # INSURANCE
-    # ========================================================================
-    
-    def set_insurance(self, national_id: str, insurance_data: dict):
-        """Set or update insurance information"""
-        with get_db() as db:
-            insurance = db.query(Insurance).filter(
-                Insurance.patient_national_id == national_id
-            ).first()
-            
-            if insurance:
-                # Update existing
-                for key, value in insurance_data.items():
-                    if hasattr(insurance, key):
-                        setattr(insurance, key, value)
-            else:
-                # Create new
-                insurance = Insurance(
-                    patient_national_id=national_id,
-                    **insurance_data
-                )
-                db.add(insurance)
-            
-            db.commit()
-            return insurance
-    
-    def get_insurance(self, national_id: str):
-        """Get insurance information"""
-        with get_db() as db:
-            return db.query(Insurance).filter(
-                Insurance.patient_national_id == national_id
-            ).first()
-    
-    # ========================================================================
-    # MEDICAL HISTORY SUMMARY
-    # ========================================================================
-    
-    def get_complete_medical_history(self, national_id: str):
-        """Get complete medical history for patient"""
-        with get_db() as db:
-            patient = db.query(Patient).filter(
-                Patient.national_id == national_id
-            ).first()
+        db = get_db()
+        try:
+            patient = db.query(Patient).filter_by(national_id=national_id).first()
             
             if not patient:
                 return None
             
-            return {
-                'patient': patient.to_dict(),
-                'allergies': [a.to_dict() for a in patient.allergies],
-                'chronic_diseases': [cd.disease_name for cd in patient.chronic_diseases],
-                'current_medications': [m.to_dict() for m in patient.current_medications if m.is_active],
-                'surgeries': [s.procedure_name for s in patient.surgeries],
-                'hospitalizations': len(patient.hospitalizations),
-                'vaccinations': [v.vaccine_name for v in patient.vaccinations],
-                'visits': len(patient.visits),
-                'lab_results': len(patient.lab_results),
-                'imaging_results': len(patient.imaging_results),
-            }
+            # Convert to dict while in session (CRITICAL!)
+            return self._patient_to_dict(patient)
+        finally:
+            db.close()
     
-    # ========================================================================
-    # STATISTICS
-    # ========================================================================
+    def get_patient_by_id(self, national_id: str):
+        """Alias for get_patient (for compatibility)"""
+        return self.get_patient(national_id)
+    
+    def get_all_patients(self):
+        """Get all patients - returns list of dicts"""
+        db = get_db()
+        try:
+            patients = db.query(Patient).order_by(Patient.full_name).all()
+            return [self._patient_to_dict(p) for p in patients]
+        finally:
+            db.close()
+    
+    def search_patients(self, search_term: str):
+        """Search patients by name or national ID"""
+        db = get_db()
+        try:
+            search = f"%{search_term}%"
+            patients = db.query(Patient).filter(
+                (Patient.full_name.ilike(search)) |
+                (Patient.national_id.ilike(search)) |
+                (Patient.phone.ilike(search))
+            ).limit(50).all()
+            
+            return [self._patient_to_dict(p) for p in patients]
+        finally:
+            db.close()
+    
+    def create_patient(self, patient_data: dict):
+        """Create new patient"""
+        db = get_db()
+        try:
+            patient = Patient(**patient_data)
+            db.add(patient)
+            db.commit()
+            db.refresh(patient)
+            return self._patient_to_dict(patient)
+        except Exception as e:
+            db.rollback()
+            print(f"Error creating patient: {e}")
+            return None
+        finally:
+            db.close()
+    
+    def update_patient(self, national_id: str, update_data: dict):
+        """Update patient information"""
+        db = get_db()
+        try:
+            patient = db.query(Patient).filter_by(national_id=national_id).first()
+            
+            if not patient:
+                return None
+            
+            for key, value in update_data.items():
+                if hasattr(patient, key):
+                    setattr(patient, key, value)
+            
+            patient.last_updated = datetime.now()
+            db.commit()
+            db.refresh(patient)
+            
+            return self._patient_to_dict(patient)
+        except Exception as e:
+            db.rollback()
+            print(f"Error updating patient: {e}")
+            return None
+        finally:
+            db.close()
+    
+    def get_surgeries(self, national_id: str):
+        """Get patient surgeries"""
+        db = get_db()
+        try:
+            surgeries = db.query(Surgery).filter_by(
+                patient_national_id=national_id
+            ).order_by(Surgery.date.desc()).all()
+            
+            return [{
+                'surgery_id': s.surgery_id,
+                'procedure_name': s.procedure_name,
+                'date': s.date,
+                'surgeon_name': s.surgeon_name,
+                'hospital': s.hospital,
+                'outcome': s.outcome,
+                'complications': s.complications,
+                'recovery_notes': s.recovery_notes
+            } for s in surgeries]
+        finally:
+            db.close()
+    
+    def get_hospitalizations(self, national_id: str):
+        """Get patient hospitalizations"""
+        db = get_db()
+        try:
+            hosps = db.query(Hospitalization).filter_by(
+                patient_national_id=national_id
+            ).order_by(Hospitalization.admission_date.desc()).all()
+            
+            return [{
+                'hospitalization_id': h.hospitalization_id,
+                'hospital': h.hospital,
+                'department': h.department,
+                'admission_date': h.admission_date,
+                'discharge_date': h.discharge_date,
+                'admission_reason': h.admission_reason,
+                'diagnosis': h.diagnosis,
+                'treatment_summary': h.treatment_summary,
+                'days_stayed': h.days_stayed
+            } for h in hosps]
+        finally:
+            db.close()
+    
+    def get_vaccinations(self, national_id: str):
+        """Get patient vaccinations"""
+        db = get_db()
+        try:
+            vaccs = db.query(Vaccination).filter_by(
+                patient_national_id=national_id
+            ).order_by(Vaccination.date_administered.desc()).all()
+            
+            return [{
+                'id': v.id,
+                'vaccine_name': v.vaccine_name,
+                'date_administered': v.date_administered,
+                'dose_number': v.dose_number,
+                'location': v.location,
+                'batch_number': v.batch_number,
+                'next_dose_due': v.next_dose_due,
+                'administered_by': v.administered_by
+            } for v in vaccs]
+        finally:
+            db.close()
+    
+    def get_current_medications(self, national_id: str):
+        """Get patient's active medications"""
+        db = get_db()
+        try:
+            meds = db.query(CurrentMedication).filter_by(
+                patient_national_id=national_id,
+                is_active=True
+            ).all()
+            
+            return [{
+                'id': m.id,
+                'medication_name': m.medication_name,
+                'dosage': m.dosage,
+                'frequency': m.frequency,
+                'started_date': m.started_date,
+                'prescribed_by': m.prescribed_by,
+                'notes': m.notes
+            } for m in meds]
+        finally:
+            db.close()
     
     def get_patient_count(self):
         """Get total number of patients"""
-        with get_db() as db:
+        db = get_db()
+        try:
             return db.query(Patient).count()
+        finally:
+            db.close()
     
-    def get_patients_by_blood_type(self, blood_type: str):
-        """Get patients by blood type"""
-        with get_db() as db:
-            return db.query(Patient).filter(
-                Patient.blood_type == blood_type
-            ).all()
+    def _patient_to_dict(self, patient):
+        """
+        Convert Patient ORM object to dict
+        MUST be called while session is active!
+        """
+        return {
+            'id': patient.id,
+            'national_id': patient.national_id,
+            'full_name': patient.full_name,
+            'date_of_birth': patient.date_of_birth,
+            'age': patient.age,
+            'gender': patient.gender.value if patient.gender else None,
+            'blood_type': patient.blood_type.value if patient.blood_type else None,
+            'phone': patient.phone,
+            'email': patient.email,
+            'address': patient.address,
+            'city': patient.city,
+            'governorate': patient.governorate,
+            
+            # JSON fields - directly accessible
+            'emergency_contact': patient.emergency_contact or {},
+            'chronic_diseases': patient.chronic_diseases or [],
+            'allergies': patient.allergies or [],
+            'family_history': patient.family_history or {},
+            'disabilities_special_needs': patient.disabilities_special_needs or {},
+            'emergency_directives': patient.emergency_directives or {},
+            'lifestyle': patient.lifestyle or {},
+            'insurance': patient.insurance or {},
+            'external_links': patient.external_links or {},
+            
+            # NFC card info
+            'nfc_card_uid': patient.nfc_card_uid,
+            'nfc_card_assigned': patient.nfc_card_assigned,
+            'nfc_card_status': patient.nfc_card_status.value if patient.nfc_card_status else None,
+            
+            # Timestamps
+            'created_at': patient.created_at,
+            'last_updated': patient.last_updated
+        }
+
 
 # Global instance
 patient_manager = PatientManager()

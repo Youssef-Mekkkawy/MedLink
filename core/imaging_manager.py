@@ -5,7 +5,7 @@ MySQL Version - Compatible with existing GUI
 
 from datetime import datetime, date
 from core.database import get_db
-from database.models import ImagingResult
+from core.models import ImagingResult
 
 class ImagingManager:
     """Manage imaging results"""

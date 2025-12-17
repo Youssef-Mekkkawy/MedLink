@@ -4,7 +4,7 @@ Visit, Lab Results, Imaging, and NFC Card Managers
 
 from datetime import datetime, date
 from database.database_manager import DatabaseManager
-from database.models import Visit, Prescription, LabResult, ImagingResult, NFCCard, HardwareAuditLog
+from core.models import Visit, Prescription, LabResult, ImagingResult, NFCCard, HardwareAuditLog
 
 # ============================================================================
 # VISIT MANAGER
