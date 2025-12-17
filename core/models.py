@@ -1,11 +1,12 @@
 """
-SQLAlchemy ORM Models for MedLink
-All database models with relationships
+COMPLETE SQLAlchemy ORM Models for MedLink
+All database models with relationships - INCLUDING ALL MISSING MODELS
+Location: database/models.py
 """
 
 from sqlalchemy import (
-    Column, Integer, String, Text, Date, DateTime, Time, Boolean, 
-    Enum, ForeignKey, JSON, Index
+    Column, Integer, String, Text, Date, DateTime, Time, Boolean,
+    Enum, ForeignKey, JSON, Index, Float
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -92,63 +93,60 @@ class EventType(enum.Enum):
     other = "other"
 
 
-# ==================== USER MODEL ====================
+# ==================== USER MODELS ====================
 
 class User(Base):
     """User model for doctors, staff, and patients"""
     __tablename__ = 'users'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String(50), unique=True, nullable=False, index=True)
-    username = Column(String(100), unique=True, nullable=False, index=True)
+
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), nullable=False, index=True)
+    role = Column(Enum(UserRole), nullable=False)
     full_name = Column(String(200), nullable=False)
     email = Column(String(150))
     phone = Column(String(20))
-    
-    # Doctor-specific fields
-    specialization = Column(String(100))
-    hospital = Column(String(200))
-    license_number = Column(String(50))
-    years_experience = Column(Integer)
-    
-    # Biometric fields
-    fingerprint_id = Column(Integer)
-    fingerprint_enrolled = Column(Boolean, default=False)
-    fingerprint_enrollment_date = Column(Date)
-    nfc_card_uid = Column(String(50), index=True)
-    biometric_enabled = Column(Boolean, default=False)
-    last_fingerprint_login = Column(DateTime)
-    fingerprint_login_count = Column(Integer, default=0)
-    
-    # Patient-specific fields (for patient users)
-    national_id = Column(String(14), index=True)
-    date_of_birth = Column(Date)
-    
-    # System fields
-    created_at = Column(DateTime, default=func.now())
-    last_login = Column(DateTime)
-    login_count = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
     account_status = Column(Enum(AccountStatus), default=AccountStatus.active)
+    last_login = Column(DateTime)
+    created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
-    visits_as_doctor = relationship("Visit", foreign_keys="Visit.doctor_id", back_populates="doctor")
-    lab_results_ordered = relationship("LabResult", foreign_keys="LabResult.ordered_by", back_populates="ordered_by_user")
-    imaging_results_ordered = relationship("ImagingResult", foreign_keys="ImagingResult.ordered_by", back_populates="ordered_by_user")
-    doctor_cards = relationship("DoctorCard", back_populates="user")
-    
+    doctor = relationship("Doctor", back_populates="user",
+                          uselist=False, cascade="all, delete-orphan")
+
     def __repr__(self):
-        return f"<User(user_id='{self.user_id}', username='{self.username}', role='{self.role.value}')>"
-    
-    @property
-    def is_doctor(self):
-        return self.role == UserRole.doctor
-    
-    @property
-    def is_patient(self):
-        return self.role == UserRole.patient
+        return f"<User(username='{self.username}', role='{self.role.value}')>"
+
+
+class Doctor(Base):
+    """Doctor profile model"""
+    __tablename__ = 'doctors'
+
+    doctor_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'),
+                     unique=True, nullable=False)
+    national_id = Column(String(14), unique=True, nullable=False, index=True)
+    specialization = Column(String(100))
+    license_number = Column(String(50), unique=True, nullable=False)
+    hospital = Column(String(200))
+    department = Column(String(100))
+    years_of_experience = Column(Integer)
+    consultation_fee = Column(Float)
+    bio = Column(Text)
+    qualifications = Column(JSON)
+    available_hours = Column(JSON)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="doctor")
+    visits = relationship("Visit", back_populates="doctor",
+                          cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Doctor(name='{self.user.full_name if self.user else 'N/A'}', specialization='{self.specialization}')>"
 
 
 # ==================== PATIENT MODEL ====================
@@ -156,7 +154,7 @@ class User(Base):
 class Patient(Base):
     """Patient model with complete medical information"""
     __tablename__ = 'patients'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     national_id = Column(String(14), unique=True, nullable=False, index=True)
     full_name = Column(String(200), nullable=False, index=True)
@@ -164,25 +162,19 @@ class Patient(Base):
     age = Column(Integer)
     gender = Column(Enum(Gender), nullable=False)
     blood_type = Column(Enum(BloodType))
-    
+
     # Contact Information
     phone = Column(String(20), index=True)
     email = Column(String(150))
     address = Column(Text)
     city = Column(String(100))
     governorate = Column(String(100))
-    
+
     # JSON Fields for complex data
     emergency_contact = Column(JSON)  # {name, relation, phone}
-    chronic_diseases = Column(JSON)  # Array of diseases
-    allergies = Column(JSON)  # Array of allergies
-    family_history = Column(JSON)  # Complete family medical history
-    disabilities_special_needs = Column(JSON)  # Disability information
-    emergency_directives = Column(JSON)  # DNR, organ donor, etc.
-    lifestyle = Column(JSON)  # Smoking, alcohol, exercise, etc.
     insurance = Column(JSON)  # Insurance information
     external_links = Column(JSON)  # External system links
-    
+
     # NFC Card Information
     nfc_card_uid = Column(String(50), index=True)
     nfc_card_assigned = Column(Boolean, default=False)
@@ -191,100 +183,93 @@ class Patient(Base):
     nfc_card_status = Column(Enum(CardStatus), default=CardStatus.active)
     nfc_card_last_scan = Column(DateTime)
     nfc_scan_count = Column(Integer, default=0)
-    
+
     # System fields
     created_at = Column(DateTime, default=func.now())
     last_updated = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
-    surgeries = relationship("Surgery", back_populates="patient", cascade="all, delete-orphan")
-    hospitalizations = relationship("Hospitalization", back_populates="patient", cascade="all, delete-orphan")
-    vaccinations = relationship("Vaccination", back_populates="patient", cascade="all, delete-orphan")
-    current_medications = relationship("CurrentMedication", back_populates="patient", cascade="all, delete-orphan")
-    visits = relationship("Visit", back_populates="patient", cascade="all, delete-orphan")
-    lab_results = relationship("LabResult", back_populates="patient", cascade="all, delete-orphan")
-    imaging_results = relationship("ImagingResult", back_populates="patient", cascade="all, delete-orphan")
-    patient_cards = relationship("PatientCard", back_populates="patient", cascade="all, delete-orphan")
-    
+    allergies = relationship(
+        "Allergy", back_populates="patient", cascade="all, delete-orphan")
+    chronic_diseases = relationship(
+        "ChronicDisease", back_populates="patient", cascade="all, delete-orphan")
+    current_medications = relationship(
+        "CurrentMedication", back_populates="patient", cascade="all, delete-orphan")
+    surgeries = relationship(
+        "Surgery", back_populates="patient", cascade="all, delete-orphan")
+    hospitalizations = relationship(
+        "Hospitalization", back_populates="patient", cascade="all, delete-orphan")
+    vaccinations = relationship(
+        "Vaccination", back_populates="patient", cascade="all, delete-orphan")
+    visits = relationship("Visit", back_populates="patient",
+                          cascade="all, delete-orphan")
+    lab_results = relationship(
+        "LabResult", back_populates="patient", cascade="all, delete-orphan")
+    imaging_results = relationship(
+        "ImagingResult", back_populates="patient", cascade="all, delete-orphan")
+    patient_cards = relationship(
+        "PatientCard", back_populates="patient", cascade="all, delete-orphan")
+    family_history = relationship(
+        "FamilyHistory", back_populates="patient", cascade="all, delete-orphan")
+    disabilities = relationship(
+        "Disability", back_populates="patient", cascade="all, delete-orphan")
+    emergency_directives = relationship(
+        "EmergencyDirective", back_populates="patient", cascade="all, delete-orphan")
+    lifestyle = relationship(
+        "Lifestyle", back_populates="patient", uselist=False, cascade="all, delete-orphan")
+    insurance_info = relationship(
+        "Insurance", back_populates="patient", uselist=False, cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<Patient(national_id='{self.national_id}', name='{self.full_name}')>"
 
 
-# ==================== SURGERY MODEL ====================
+# ==================== ALLERGY MODEL (NEW) ====================
 
-class Surgery(Base):
-    """Patient surgery records"""
-    __tablename__ = 'surgeries'
-    
+class Allergy(Base):
+    """Patient allergies"""
+    __tablename__ = 'allergies'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    surgery_id = Column(String(50), unique=True, nullable=False)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    surgery_type = Column(String(200), nullable=False)
-    surgery_date = Column(Date, nullable=False, index=True)
-    surgeon = Column(String(200))
-    hospital = Column(String(200))
-    reason = Column(Text)
-    outcome = Column(Text)
-    complications = Column(Text)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    allergen_name = Column(String(200), nullable=False)
+    severity = Column(String(50))  # Mild, Moderate, Severe, Life-threatening
+    reaction = Column(Text)  # Description of reaction
     notes = Column(Text)
+    date_identified = Column(Date)
     created_at = Column(DateTime, default=func.now())
-    
-    # Relationships
-    patient = relationship("Patient", back_populates="surgeries")
-    
+
+    # Relationship
+    patient = relationship("Patient", back_populates="allergies")
+
     def __repr__(self):
-        return f"<Surgery(id='{self.surgery_id}', type='{self.surgery_type}', date='{self.surgery_date}')>"
+        return f"<Allergy(allergen='{self.allergen_name}', severity='{self.severity}')>"
 
 
-# ==================== HOSPITALIZATION MODEL ====================
+# ==================== CHRONIC DISEASE MODEL (NEW) ====================
 
-class Hospitalization(Base):
-    """Patient hospitalization records"""
-    __tablename__ = 'hospitalizations'
-    
+class ChronicDisease(Base):
+    """Patient chronic diseases"""
+    __tablename__ = 'chronic_diseases'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    hospitalization_id = Column(String(50), unique=True, nullable=False)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    hospital = Column(String(200), nullable=False)
-    admission_date = Column(Date, nullable=False, index=True)
-    discharge_date = Column(Date)
-    reason = Column(Text)
-    diagnosis = Column(Text)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    disease_name = Column(String(200), nullable=False)
+    date_diagnosed = Column(Date)
+    severity = Column(String(50))
     treatment = Column(Text)
-    length_of_stay = Column(Integer)
     notes = Column(Text)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
-    
-    # Relationships
-    patient = relationship("Patient", back_populates="hospitalizations")
-    
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="chronic_diseases")
+
     def __repr__(self):
-        return f"<Hospitalization(id='{self.hospitalization_id}', hospital='{self.hospital}')>"
-
-
-# ==================== VACCINATION MODEL ====================
-
-class Vaccination(Base):
-    """Patient vaccination records"""
-    __tablename__ = 'vaccinations'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    vaccine_name = Column(String(200), nullable=False, index=True)
-    date_administered = Column(Date, nullable=False, index=True)
-    dose_number = Column(String(50))
-    location = Column(String(200))
-    batch_number = Column(String(100))
-    next_dose_due = Column(Date)
-    administrator = Column(String(200))
-    notes = Column(Text)
-    created_at = Column(DateTime, default=func.now())
-    
-    # Relationships
-    patient = relationship("Patient", back_populates="vaccinations")
-    
-    def __repr__(self):
-        return f"<Vaccination(vaccine='{self.vaccine_name}', date='{self.date_administered}')>"
+        return f"<ChronicDisease(disease='{self.disease_name}')>"
 
 
 # ==================== CURRENT MEDICATION MODEL ====================
@@ -292,110 +277,362 @@ class Vaccination(Base):
 class CurrentMedication(Base):
     """Patient current medications"""
     __tablename__ = 'current_medications'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    medication_name = Column(String(200), nullable=False, index=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    medication_name = Column(String(200), nullable=False)
     dosage = Column(String(100))
     frequency = Column(String(100))
-    started_date = Column(Date)
+    route = Column(String(50))  # Oral, Injection, Topical, etc.
+    start_date = Column(Date)
     end_date = Column(Date)
     prescribed_by = Column(String(200))
     reason = Column(Text)
     notes = Column(Text)
-    is_active = Column(Boolean, default=True, index=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    # Relationships
+
+    # Relationship
     patient = relationship("Patient", back_populates="current_medications")
-    
+
     def __repr__(self):
-        return f"<CurrentMedication(medication='{self.medication_name}', active={self.is_active})>"
+        return f"<CurrentMedication(medication='{self.medication_name}', dosage='{self.dosage}')>"
+
+
+# ==================== SURGERY MODEL ====================
+
+class Surgery(Base):
+    """Surgical procedures"""
+    __tablename__ = 'surgeries'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    surgery_id = Column(String(50), unique=True)
+    procedure_name = Column(String(200), nullable=False)
+    surgery_date = Column(Date, nullable=False, index=True)
+    hospital = Column(String(200))
+    surgeon_name = Column(String(200))
+    anesthesia_type = Column(String(100))
+    duration = Column(String(50))
+    complications = Column(Text)
+    recovery_notes = Column(Text)
+    outcome = Column(String(100))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="surgeries")
+
+    def __repr__(self):
+        return f"<Surgery(procedure='{self.procedure_name}', date='{self.surgery_date}')>"
+
+
+# ==================== HOSPITALIZATION MODEL ====================
+
+class Hospitalization(Base):
+    """Hospital admissions"""
+    __tablename__ = 'hospitalizations'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    hospitalization_id = Column(String(50), unique=True)
+    admission_date = Column(Date, nullable=False, index=True)
+    discharge_date = Column(Date)
+    hospital = Column(String(200), nullable=False)
+    department = Column(String(100))
+    attending_doctor = Column(String(200))
+    admission_reason = Column(Text)
+    diagnosis = Column(Text)
+    treatment_summary = Column(Text)
+    discharge_notes = Column(Text)
+    outcome = Column(String(100))
+    days_stayed = Column(Integer)
+    room_number = Column(String(20))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="hospitalizations")
+
+    def __repr__(self):
+        return f"<Hospitalization(hospital='{self.hospital}', admission='{self.admission_date}')>"
+
+
+# ==================== VACCINATION MODEL ====================
+
+class Vaccination(Base):
+    """Vaccination records"""
+    __tablename__ = 'vaccinations'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    vaccine_name = Column(String(200), nullable=False)
+    vaccine_type = Column(String(100))
+    date_administered = Column(Date, nullable=False, index=True)
+    dose_number = Column(String(50))
+    location = Column(String(200))
+    administered_by = Column(String(200))
+    batch_number = Column(String(100))
+    expiry_date = Column(Date)
+    next_dose_due = Column(Date)
+    site = Column(String(100))  # Injection site
+    route = Column(String(50))  # IM, SC, Oral, etc.
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="vaccinations")
+
+    def __repr__(self):
+        return f"<Vaccination(vaccine='{self.vaccine_name}', date='{self.date_administered}')>"
+
+
+# ==================== FAMILY HISTORY MODEL (NEW) ====================
+
+class FamilyHistory(Base):
+    """Family medical history"""
+    __tablename__ = 'family_history'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    # Father, Mother, Sibling, etc.
+    relation = Column(String(50), nullable=False)
+    is_alive = Column(Boolean, default=True)
+    age = Column(Integer)
+    age_at_death = Column(Integer)
+    cause_of_death = Column(String(200))
+    medical_conditions = Column(JSON)  # List of conditions
+    genetic_conditions = Column(JSON)  # List of genetic conditions
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="family_history")
+
+    def __repr__(self):
+        return f"<FamilyHistory(relation='{self.relation}')>"
+
+
+# ==================== DISABILITY MODEL (NEW) ====================
+
+class Disability(Base):
+    """Disability and special needs"""
+    __tablename__ = 'disabilities'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    disability_type = Column(String(200))
+    severity = Column(String(50))
+    description = Column(Text)
+    mobility_aids = Column(JSON)  # List of mobility aids
+    hearing_impairment = Column(Boolean, default=False)
+    visual_impairment = Column(Boolean, default=False)
+    cognitive_impairment = Column(Boolean, default=False)
+    communication_needs = Column(JSON)  # List of communication needs
+    accessibility_requirements = Column(JSON)  # List of requirements
+    accommodations_needed = Column(Text)
+    date_diagnosed = Column(Date)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="disabilities")
+
+    def __repr__(self):
+        return f"<Disability(type='{self.disability_type}')>"
+
+
+# ==================== EMERGENCY DIRECTIVE MODEL (NEW) ====================
+
+class EmergencyDirective(Base):
+    """Emergency directives and advance care planning"""
+    __tablename__ = 'emergency_directives'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    dnr_status = Column(Boolean, default=False)  # Do Not Resuscitate
+    organ_donor = Column(Boolean, default=False)
+    power_of_attorney_name = Column(String(200))
+    power_of_attorney_phone = Column(String(20))
+    power_of_attorney_relation = Column(String(100))
+    religious_preferences = Column(Text)
+    end_of_life_wishes = Column(Text)
+    special_instructions = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="emergency_directives")
+
+    def __repr__(self):
+        return f"<EmergencyDirective(patient='{self.patient_national_id}', DNR={self.dnr_status})>"
+
+
+# ==================== LIFESTYLE MODEL (NEW) ====================
+
+class Lifestyle(Base):
+    """Patient lifestyle information"""
+    __tablename__ = 'lifestyle'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), unique=True, nullable=False)
+    smoking_status = Column(String(50))  # Never, Former, Current
+    smoking_pack_years = Column(Integer)
+    alcohol_use = Column(String(50))  # None, Occasional, Regular, Heavy
+    alcohol_drinks_per_week = Column(Integer)
+    # Sedentary, Light, Moderate, Active, Very Active
+    exercise_frequency = Column(String(100))
+    exercise_type = Column(JSON)  # List of exercise types
+    diet_type = Column(String(100))  # Regular, Vegetarian, Vegan, etc.
+    dietary_restrictions = Column(JSON)  # List of restrictions
+    sleep_hours = Column(Integer)
+    occupation = Column(String(200))
+    occupation_hazards = Column(JSON)  # List of occupational hazards
+    stress_level = Column(String(50))  # Low, Moderate, High
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="lifestyle")
+
+    def __repr__(self):
+        return f"<Lifestyle(patient='{self.patient_national_id}')>"
+
+
+# ==================== INSURANCE MODEL (NEW) ====================
+
+class Insurance(Base):
+    """Patient insurance information"""
+    __tablename__ = 'insurance'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), unique=True, nullable=False)
+    insurance_provider = Column(String(200))
+    policy_number = Column(String(100))
+    group_number = Column(String(100))
+    policy_holder_name = Column(String(200))
+    policy_holder_relation = Column(String(50))
+    coverage_start_date = Column(Date)
+    coverage_end_date = Column(Date)
+    coverage_type = Column(String(100))  # Individual, Family, Group
+    coverage_details = Column(JSON)  # Covered services
+    copay_amount = Column(Float)
+    deductible_amount = Column(Float)
+    out_of_pocket_max = Column(Float)
+    is_active = Column(Boolean, default=True)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    patient = relationship("Patient", back_populates="insurance_info")
+
+    def __repr__(self):
+        return f"<Insurance(provider='{self.insurance_provider}', policy='{self.policy_number}')>"
 
 
 # ==================== VISIT MODEL ====================
 
 class Visit(Base):
-    """Medical visit records"""
+    """Medical visits"""
     __tablename__ = 'visits'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    visit_id = Column(String(50), unique=True, nullable=False, index=True)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    doctor_id = Column(String(50), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
-    doctor_name = Column(String(200), nullable=False)
-    
+    visit_id = Column(String(50), unique=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    doctor_id = Column(Integer, ForeignKey(
+        'doctors.doctor_id'), nullable=False)
     visit_date = Column(Date, nullable=False, index=True)
     visit_time = Column(Time)
+    visit_type = Column(Enum(VisitType), default=VisitType.Consultation)
     hospital = Column(String(200))
     department = Column(String(100))
-    visit_type = Column(Enum(VisitType), nullable=False, index=True)
-    
     chief_complaint = Column(Text)
     diagnosis = Column(Text)
     treatment_plan = Column(Text)
     notes = Column(Text)
-    
-    attachments = Column(JSON)  # Array of attachment paths
-    
+    follow_up_date = Column(Date)
+    status = Column(String(50), default='Completed')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     patient = relationship("Patient", back_populates="visits")
-    doctor = relationship("User", foreign_keys=[doctor_id], back_populates="visits_as_doctor")
-    prescriptions = relationship("Prescription", back_populates="visit", cascade="all, delete-orphan")
-    vital_signs = relationship("VitalSign", back_populates="visit", cascade="all, delete-orphan")
-    
+    doctor = relationship("Doctor", back_populates="visits")
+    prescriptions = relationship(
+        "Prescription", back_populates="visit", cascade="all, delete-orphan")
+    vital_signs = relationship(
+        "VitalSign", back_populates="visit", cascade="all, delete-orphan")
+
     def __repr__(self):
-        return f"<Visit(id='{self.visit_id}', date='{self.visit_date}', type='{self.visit_type.value}')>"
+        return f"<Visit(patient='{self.patient_national_id}', date='{self.visit_date}')>"
 
-
-# ==================== PRESCRIPTION MODEL ====================
 
 class Prescription(Base):
-    """Prescriptions from visits"""
+    """Prescriptions given during visits"""
     __tablename__ = 'prescriptions'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    visit_id = Column(String(50), ForeignKey('visits.visit_id', ondelete='CASCADE'), nullable=False, index=True)
-    medication = Column(String(200), nullable=False)
+    visit_id = Column(Integer, ForeignKey('visits.id'), nullable=False)
+    medication_name = Column(String(200), nullable=False)
     dosage = Column(String(100))
     frequency = Column(String(100))
-    duration = Column(String(50))
+    duration = Column(String(100))
+    quantity = Column(Integer)
+    route = Column(String(50))
     instructions = Column(Text)
+    notes = Column(Text)
     created_at = Column(DateTime, default=func.now())
-    
-    # Relationships
+
+    # Relationship
     visit = relationship("Visit", back_populates="prescriptions")
-    
+
     def __repr__(self):
-        return f"<Prescription(medication='{self.medication}', dosage='{self.dosage}')>"
+        return f"<Prescription(medication='{self.medication_name}', dosage='{self.dosage}')>"
 
-
-# ==================== VITAL SIGN MODEL ====================
 
 class VitalSign(Base):
-    """Vital signs from visits"""
+    """Vital signs recorded during visits"""
     __tablename__ = 'vital_signs'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    visit_id = Column(String(50), ForeignKey('visits.visit_id', ondelete='CASCADE'), nullable=False, index=True)
-    blood_pressure = Column(String(20))
-    heart_rate = Column(String(20))
-    temperature = Column(String(20))
-    weight = Column(String(20))
-    height = Column(String(20))
-    respiratory_rate = Column(String(20))
-    oxygen_saturation = Column(String(20))
-    created_at = Column(DateTime, default=func.now())
-    
-    # Relationships
+    visit_id = Column(Integer, ForeignKey('visits.id'), nullable=False)
+    blood_pressure_systolic = Column(Integer)
+    blood_pressure_diastolic = Column(Integer)
+    heart_rate = Column(Integer)
+    temperature = Column(Float)
+    temperature_unit = Column(String(1), default='C')  # C or F
+    respiratory_rate = Column(Integer)
+    oxygen_saturation = Column(Integer)
+    weight = Column(Float)
+    weight_unit = Column(String(2), default='kg')
+    height = Column(Float)
+    height_unit = Column(String(2), default='cm')
+    bmi = Column(Float)
+    notes = Column(Text)
+    recorded_at = Column(DateTime, default=func.now())
+
+    # Relationship
     visit = relationship("Visit", back_populates="vital_signs")
-    
+
     def __repr__(self):
-        return f"<VitalSign(bp='{self.blood_pressure}', hr='{self.heart_rate}')>"
+        return f"<VitalSign(BP={self.blood_pressure_systolic}/{self.blood_pressure_diastolic})>"
 
 
 # ==================== LAB RESULT MODEL ====================
@@ -403,206 +640,154 @@ class VitalSign(Base):
 class LabResult(Base):
     """Laboratory test results"""
     __tablename__ = 'lab_results'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    result_id = Column(String(50), unique=True, nullable=False, index=True)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    ordered_by = Column(String(50), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
-    
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    test_name = Column(String(200), nullable=False)
+    test_category = Column(String(100))
     test_date = Column(Date, nullable=False, index=True)
     lab_name = Column(String(200))
-    test_type = Column(String(200), nullable=False)
-    status = Column(Enum(TestStatus), default=TestStatus.pending, index=True)
-    
-    results = Column(JSON)  # Test results as key-value pairs
-    notes = Column(Text)
-    
-    external_link = Column(String(500))
-    attachment = Column(String(500))
-    
+    results_summary = Column(Text)
+    results_data = Column(JSON)  # Structured test results
+    reference_ranges = Column(JSON)
+    abnormal_flags = Column(JSON)
+    doctor_notes = Column(Text)
+    status = Column(Enum(TestStatus), default=TestStatus.completed)
+    file_path = Column(String(500))
+    ordered_by = Column(String(200))
     created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    # Relationships
+
+    # Relationship
     patient = relationship("Patient", back_populates="lab_results")
-    ordered_by_user = relationship("User", foreign_keys=[ordered_by], back_populates="lab_results_ordered")
-    
+
     def __repr__(self):
-        return f"<LabResult(id='{self.result_id}', type='{self.test_type}', status='{self.status.value}')>"
+        return f"<LabResult(test='{self.test_name}', date='{self.test_date}')>"
 
 
 # ==================== IMAGING RESULT MODEL ====================
 
 class ImagingResult(Base):
-    """Imaging and radiology results"""
+    """Imaging/radiology results"""
     __tablename__ = 'imaging_results'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    imaging_id = Column(String(50), unique=True, nullable=False, index=True)
-    patient_national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
-    ordered_by = Column(String(50), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
-    
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
+    imaging_type = Column(Enum(ImagingType), nullable=False)
     imaging_date = Column(Date, nullable=False, index=True)
-    imaging_center = Column(String(200))
-    imaging_type = Column(Enum(ImagingType), nullable=False, index=True)
     body_part = Column(String(100))
-    
+    imaging_center = Column(String(200))
     findings = Column(Text)
-    radiologist = Column(String(200))
-    
-    images = Column(JSON)  # Array of image paths
-    external_link = Column(String(500))
-    
+    impression = Column(Text)
+    radiologist_name = Column(String(200))
+    radiologist_notes = Column(Text)
+    status = Column(Enum(TestStatus), default=TestStatus.completed)
+    file_path = Column(String(500))
+    dicom_path = Column(String(500))
+    ordered_by = Column(String(200))
     created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    # Relationships
+
+    # Relationship
     patient = relationship("Patient", back_populates="imaging_results")
-    ordered_by_user = relationship("User", foreign_keys=[ordered_by], back_populates="imaging_results_ordered")
-    
+
     def __repr__(self):
-        return f"<ImagingResult(id='{self.imaging_id}', type='{self.imaging_type.value}', date='{self.imaging_date}')>"
+        return f"<ImagingResult(type='{self.imaging_type.value}', date='{self.imaging_date}')>"
 
 
 # ==================== NFC CARD MODELS ====================
 
-class DoctorCard(Base):
-    """NFC cards for doctors"""
-    __tablename__ = 'doctor_cards'
-    
+class NFCCard(Base):
+    """Generic NFC Card model (for backward compatibility)"""
+    __tablename__ = 'nfc_cards'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     card_uid = Column(String(50), unique=True, nullable=False, index=True)
-    username = Column(String(100), nullable=False)
-    user_id = Column(String(50), ForeignKey('users.user_id', ondelete='CASCADE'), index=True)
-    full_name = Column(String(200), nullable=False)
-    card_type = Column(String(20), default='doctor')
-    is_active = Column(Boolean, default=True)
-    issued_date = Column(DateTime, default=func.now())
+    card_type = Column(String(50), nullable=False)  # 'doctor' or 'patient'
+    # user_id for doctors, national_id for patients
+    owner_id = Column(String(50), nullable=False)
+    owner_name = Column(String(200), nullable=False)
+    status = Column(Enum(CardStatus), default=CardStatus.active)
+    issue_date = Column(Date)
+    expiry_date = Column(Date)
     last_used = Column(DateTime)
-    
-    # Relationships
-    user = relationship("User", back_populates="doctor_cards")
-    
+    use_count = Column(Integer, default=0)
+    card_metadata = Column(JSON)
+    created_at = Column(DateTime, default=func.now())
+
     def __repr__(self):
-        return f"<DoctorCard(uid='{self.card_uid}', name='{self.full_name}')>"
+        return f"<NFCCard(uid='{self.card_uid}', type='{self.card_type}', owner='{self.owner_name}')>"
+
+
+class DoctorCard(Base):
+    __tablename__ = "doctor_cards"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    card_uid = Column(String(50), unique=True, index=True, nullable=False)
+
+    username = Column(String(100), nullable=False)          # ✅ exists in table
+    # ✅ table allows NULL, keep nullable
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    full_name = Column(String(200), nullable=False)
+
+    card_type = Column(String(20))                          # ✅ exists in table
+    # ✅ exists in table (tinyint)
+    is_active = Column(Boolean)
+
+    # ✅ exists in table (datetime)
+    issued_date = Column(DateTime)
+    # ✅ exists in table (datetime)
+    last_used = Column(DateTime)
+
+    def __repr__(self):
+        return f"<DoctorCard(uid='{self.card_uid}', username='{self.username}', active={self.is_active})>"
 
 
 class PatientCard(Base):
-    """NFC cards for patients"""
+    """Patient NFC cards"""
     __tablename__ = 'patient_cards'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     card_uid = Column(String(50), unique=True, nullable=False, index=True)
-    national_id = Column(String(14), ForeignKey('patients.national_id', ondelete='CASCADE'), nullable=False, index=True)
+    patient_national_id = Column(String(14), ForeignKey(
+        'patients.national_id'), nullable=False)
     full_name = Column(String(200), nullable=False)
-    card_type = Column(String(20), default='patient')
-    is_active = Column(Boolean, default=True)
-    issued_date = Column(DateTime, default=func.now())
+    blood_type = Column(String(5))
+    card_type = Column(String(50), default='patient')
+    status = Column(Enum(CardStatus), default=CardStatus.active)
+    issue_date = Column(Date)
+    expiry_date = Column(Date)
     last_used = Column(DateTime)
-    
-    # Relationships
+    use_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationship
     patient = relationship("Patient", back_populates="patient_cards")
-    
+
     def __repr__(self):
-        return f"<PatientCard(uid='{self.card_uid}', name='{self.full_name}')>"
-
-
-# Convenience class for backward compatibility
-class NFCCard:
-    """
-    Convenience class for NFC card operations
-    Can work with both DoctorCard and PatientCard
-    """
-    
-    @staticmethod
-    def get_by_uid(db, card_uid):
-        """Get card (doctor or patient) by UID"""
-        # Try doctor card first
-        return db.query(NFCCard).filter(NFCCard.uid == card_uid).first()
- 
-        # doctor_card = db.query(DoctorCard).filter_by(card_uid=card_uid).first()
-        # if doctor_card:
-        #     return doctor_card
-        
-        # # Try patient card
-        # patient_card = db.query(PatientCard).filter_by(card_uid=card_uid).first()
-        # return patient_card
-    
-    @staticmethod
-    def is_doctor_card(card):
-        """Check if card is a doctor card"""
-        return isinstance(card, DoctorCard)
-    
-    @staticmethod
-    def is_patient_card(card):
-        """Check if card is a patient card"""
-        return isinstance(card, PatientCard)
+        return f"<PatientCard(uid='{self.card_uid}', patient='{self.full_name}')>"
 
 
 # ==================== HARDWARE AUDIT LOG ====================
 
 class HardwareAuditLog(Base):
-    """Hardware access audit log"""
-    __tablename__ = 'hardware_audit_log'
-    
+    """Hardware usage audit log"""
+    __tablename__ = 'hardware_audit_logs'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    event_id = Column(String(50), unique=True, nullable=False, index=True)
-    timestamp = Column(DateTime, nullable=False, index=True)
-    event_type = Column(Enum(EventType), nullable=False, index=True)
-    
-    user_id = Column(String(50), index=True)
-    patient_national_id = Column(String(14), index=True)
+    event_type = Column(Enum(EventType), nullable=False)
+    user_id = Column(String(50))
+    user_type = Column(String(20))  # doctor, patient
+    device_id = Column(String(100))
     card_uid = Column(String(50))
-    fingerprint_id = Column(Integer)
-    
+    fingerprint_id = Column(String(100))
     success = Column(Boolean, default=True)
-    accessed_by = Column(String(50))
-    access_type = Column(String(100))
-    ip_address = Column(String(45))
-    device_name = Column(String(100))
-    
-    additional_data = Column(JSON)
-    
-    created_at = Column(DateTime, default=func.now())
-    
+    ip_address = Column(String(50))
+    user_agent = Column(String(200))
+    error_message = Column(Text)
+    # Additional event data (renamed from 'metadata' - reserved word)
+    event_metadata = Column(JSON)
+    timestamp = Column(DateTime, default=func.now(), index=True)
+
     def __repr__(self):
-        return f"<HardwareAuditLog(event='{self.event_id}', type='{self.event_type.value}', time='{self.timestamp}')>"
-
-
-# ==================== CONVENIENCE ALIAS ====================
-
-# For backward compatibility with existing code
-Doctor = User  # Doctor is just a User with role='doctor'
-
-
-# ==================== MODEL EXPORTS ====================
-
-__all__ = [
-    'Base',
-    'User',
-    'Patient',
-    'Doctor',  # Alias for User
-    'Surgery',
-    'Hospitalization',
-    'Vaccination',
-    'CurrentMedication',
-    'Visit',
-    'Prescription',
-    'VitalSign',
-    'LabResult',
-    'ImagingResult',
-    'DoctorCard',
-    'PatientCard',
-    'NFCCard',  # Convenience class
-    'HardwareAuditLog',
-    # Enums
-    'UserRole',
-    'Gender',
-    'BloodType',
-    'VisitType',
-    'TestStatus',
-    'ImagingType',
-    'CardStatus',
-    'AccountStatus',
-    'EventType',
-]
+        return f"<HardwareAuditLog(event='{self.event_type.value}', user='{self.user_id}')>"

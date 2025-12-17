@@ -1,9 +1,7 @@
 """
-Emergency Card UI Component - Shared by both Dialog and Tab
+Emergency Card UI Component - FIXED FOR DATABASE
+Shared by both Dialog and Tab
 Location: gui/components/emergency_card_content.py
-
-This is the SINGLE SOURCE OF TRUTH for emergency card display.
-Used by both EmergencyDialog (popup) and EmergencyCardTab (tab).
 """
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
@@ -15,30 +13,69 @@ import os
 
 
 class EmergencyCardContent(ctk.CTkFrame):
-    """
-    Emergency card UI component - can be used in dialog or tab.
-    
-    This is the ONLY place where emergency card UI is defined.
-    Both EmergencyDialog and EmergencyCardTab use this component.
-    """
+    """Emergency card UI component - DATABASE COMPATIBLE"""
     
     def __init__(self, parent, patient_data, show_close_button=False):
-        """
-        Create emergency card UI
-        
-        Args:
-            parent: Parent widget (dialog or tab)
-            patient_data: Patient information dictionary
-            show_close_button: If True, shows Close button (for dialog)
-                              If False, only shows PDF button (for tab)
-        """
         super().__init__(parent, fg_color=COLORS['bg_dark'])
         
-        self.patient_data = patient_data
+        # Convert SQLAlchemy object to dict if needed
+        if hasattr(patient_data, '__dict__') and not isinstance(patient_data, dict):
+            self.patient_data = self._convert_patient_to_dict(patient_data)
+        else:
+            self.patient_data = patient_data
+            
         self.show_close_button = show_close_button
         self.parent = parent
         
         self.create_ui()
+    
+    def _convert_patient_to_dict(self, patient_obj):
+        """Convert SQLAlchemy Patient object to dictionary"""
+        try:
+            if hasattr(patient_obj, 'to_dict'):
+                return patient_obj.to_dict()
+            
+            # Manual conversion
+            data = {
+                'national_id': patient_obj.national_id,
+                'full_name': patient_obj.full_name,
+                'age': patient_obj.age,
+                'gender': patient_obj.gender.value if hasattr(patient_obj.gender, 'value') else str(patient_obj.gender),
+                'blood_type': patient_obj.blood_type.value if hasattr(patient_obj.blood_type, 'value') else str(patient_obj.blood_type),
+                'allergies': [],
+                'chronic_diseases': [],
+                'current_medications': [],
+                'emergency_contact': {}
+            }
+            
+            # Get allergies
+            if hasattr(patient_obj, 'allergies'):
+                data['allergies'] = [a.allergen_name for a in patient_obj.allergies]
+            
+            # Get chronic diseases
+            if hasattr(patient_obj, 'chronic_diseases'):
+                data['chronic_diseases'] = [cd.disease_name for cd in patient_obj.chronic_diseases]
+            
+            # Get current medications
+            if hasattr(patient_obj, 'current_medications'):
+                data['current_medications'] = [
+                    {
+                        'name': m.medication_name,
+                        'dosage': m.dosage,
+                        'frequency': m.frequency
+                    }
+                    for m in patient_obj.current_medications
+                    if hasattr(m, 'is_active') and m.is_active
+                ]
+            
+            # Get emergency contact from JSON field
+            if hasattr(patient_obj, 'emergency_contact') and patient_obj.emergency_contact:
+                data['emergency_contact'] = patient_obj.emergency_contact
+            
+            return data
+        except Exception as e:
+            print(f"Error converting patient: {e}")
+            return patient_obj if isinstance(patient_obj, dict) else {}
     
     def create_ui(self):
         """Create emergency card UI"""
@@ -164,8 +201,7 @@ class EmergencyCardContent(ctk.CTkFrame):
             )
             allergy_frame.pack(fill='x', pady=(0, 20))
 
-            allergy_content = ctk.CTkFrame(
-                allergy_frame, fg_color='transparent')
+            allergy_content = ctk.CTkFrame(allergy_frame, fg_color='transparent')
             allergy_content.pack(fill='x', padx=20, pady=20)
 
             allergy_title = ctk.CTkLabel(
@@ -203,13 +239,12 @@ class EmergencyCardContent(ctk.CTkFrame):
             )
             chronic_frame.pack(fill='x', pady=(0, 20))
 
-            chronic_content = ctk.CTkFrame(
-                chronic_frame, fg_color='transparent')
+            chronic_content = ctk.CTkFrame(chronic_frame, fg_color='transparent')
             chronic_content.pack(fill='x', padx=20, pady=20)
 
             chronic_title = ctk.CTkLabel(
                 chronic_content,
-                text="🏥 Chronic Conditions",
+                text="🥼 Chronic Conditions",
                 font=FONTS['body_bold'],
                 text_color=COLORS['text_primary']
             )
@@ -224,7 +259,7 @@ class EmergencyCardContent(ctk.CTkFrame):
             )
             chronic_text.pack(anchor='w')
 
-        # Current Medications
+        # Current Medications - Handle both dict and string formats
         medications = self.patient_data.get('current_medications', [])
         if medications:
             meds_frame = ctk.CTkFrame(
@@ -248,7 +283,10 @@ class EmergencyCardContent(ctk.CTkFrame):
             for i, med in enumerate(medications[:3], 1):
                 # Handle both dict and string formats
                 if isinstance(med, dict):
-                    med_text = f"{i}. {med.get('name', 'N/A')} - {med.get('dosage', '')} {med.get('frequency', '')}"
+                    med_name = med.get('name', med.get('medication_name', 'N/A'))
+                    dosage = med.get('dosage', '')
+                    frequency = med.get('frequency', '')
+                    med_text = f"{i}. {med_name} - {dosage} {frequency}".strip()
                 else:
                     med_text = f"{i}. {med}"
                 
@@ -263,7 +301,7 @@ class EmergencyCardContent(ctk.CTkFrame):
 
         # Emergency Contact
         emergency = self.patient_data.get('emergency_contact', {})
-        if emergency:
+        if emergency and isinstance(emergency, dict):
             contact_frame = ctk.CTkFrame(
                 content_scroll,
                 fg_color=COLORS['info'],
@@ -271,8 +309,7 @@ class EmergencyCardContent(ctk.CTkFrame):
             )
             contact_frame.pack(fill='x', pady=(0, 20))
 
-            contact_content = ctk.CTkFrame(
-                contact_frame, fg_color='transparent')
+            contact_content = ctk.CTkFrame(contact_frame, fg_color='transparent')
             contact_content.pack(fill='x', padx=20, pady=20)
 
             contact_title = ctk.CTkLabel(
@@ -313,8 +350,7 @@ class EmergencyCardContent(ctk.CTkFrame):
             qr_content = ctk.CTkFrame(qr_frame, fg_color='transparent')
             qr_content.pack(padx=20, pady=20)
 
-            qr_img = generate_patient_qr(
-                self.patient_data.get('national_id', ''))
+            qr_img = generate_patient_qr(self.patient_data.get('national_id', ''))
             qr_photo = ImageTk.PhotoImage(qr_img)
 
             qr_label = ctk.CTkLabel(
@@ -322,7 +358,7 @@ class EmergencyCardContent(ctk.CTkFrame):
                 image=qr_photo,
                 text=""
             )
-            qr_label.image = qr_photo  # Keep reference
+            qr_label.image = qr_photo
             qr_label.pack()
 
             qr_text = ctk.CTkLabel(
@@ -340,9 +376,7 @@ class EmergencyCardContent(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(self, fg_color='transparent')
         btn_frame.pack(fill='x', padx=30, pady=(0, 30))
 
-        # PDF button (always shown)
         if self.show_close_button:
-            # Dialog mode: Two buttons side by side
             generate_btn = ctk.CTkButton(
                 btn_frame,
                 text="💾 Generate PDF",
@@ -368,7 +402,6 @@ class EmergencyCardContent(ctk.CTkFrame):
             )
             close_btn.pack(side='right', fill='x', expand=True, padx=(10, 0))
         else:
-            # Tab mode: Only PDF button
             generate_btn = ctk.CTkButton(
                 btn_frame,
                 text="💾 Generate PDF Emergency Card",
@@ -383,7 +416,6 @@ class EmergencyCardContent(ctk.CTkFrame):
     def generate_pdf(self):
         """Generate emergency card PDF"""
         try:
-            # Ask where to save
             default_filename = f"Emergency_Card_{self.patient_data.get('full_name', 'Patient').replace(' ', '_')}.pdf"
 
             file_path = filedialog.asksaveasfilename(
@@ -396,7 +428,6 @@ class EmergencyCardContent(ctk.CTkFrame):
             if not file_path:
                 return
 
-            # Generate PDF
             success = generate_emergency_card(self.patient_data, file_path)
 
             if success:
@@ -406,24 +437,21 @@ class EmergencyCardContent(ctk.CTkFrame):
                     "Print this card and keep it in your wallet."
                 )
 
-                # Ask if user wants to open the file
                 if messagebox.askyesno("Open File", "Would you like to open the PDF now?"):
                     import platform
                     import subprocess
 
                     if platform.system() == 'Windows':
                         os.startfile(file_path)
-                    elif platform.system() == 'Darwin':  # macOS
+                    elif platform.system() == 'Darwin':
                         subprocess.call(['open', file_path])
-                    else:  # Linux
+                    else:
                         subprocess.call(['xdg-open', file_path])
             else:
-                messagebox.showerror(
-                    "Error", "Failed to generate emergency card PDF")
+                messagebox.showerror("Error", "Failed to generate emergency card PDF")
 
         except Exception as e:
-            messagebox.showerror(
-                "Error", f"Failed to save emergency card: {str(e)}")
+            messagebox.showerror("Error", f"Failed to save emergency card: {str(e)}")
     
     def close_parent(self):
         """Close the parent dialog"""

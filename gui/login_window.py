@@ -93,8 +93,10 @@ class LoginWindow(ctk.CTk):
         print(card_info)
         if card_info['card_type'] == 'doctor':
             user = card_info['user']  # Full User object
-            print(f"✅ Doctor: {user.full_name}")
-            self.open_dashboard(user)
+            role = user.get('role', 'Unknown')
+            print(role)
+            print(f"✅ Doctor: {user.get('full_name', 'Unknown')}")
+            self.open_dashboard(role, user)
 
         elif card_info['card_type'] == 'patient':
             patient = card_info['patient']  # Full Patient object

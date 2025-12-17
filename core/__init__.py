@@ -33,6 +33,7 @@ from core.models import (
     PatientCard,
     NFCCard,
     HardwareAuditLog,
+    FamilyHistory,
     
     # Enums
     UserRole,
@@ -76,7 +77,7 @@ __all__ = [
     'NFCCard',
     'HardwareAuditLog',
     'Disability',
-    'disabilities_special_needs',
+    
     
     # Enums
     'UserRole',
@@ -88,6 +89,7 @@ __all__ = [
     'CardStatus',
     'AccountStatus',
     'EventType',
+    'is_active',
 ]
 
 __version__ = '1.0.0'

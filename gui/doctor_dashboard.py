@@ -9,7 +9,7 @@ from gui.components.add_vaccination_dialog import AddVaccinationDialog
 from gui.components.family_history_dialog import FamilyHistoryDialog
 from gui.components.disability_dialog import DisabilityDialog
 from gui.styles import *
-from gui.components.sidebar import Sidebar
+from gui.components.sidebar import Sidebar 
 from gui.components.patient_card import PatientCard
 from core.patient_manager import patient_manager
 from core.search_engine import search_engine
