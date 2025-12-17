@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from database.connection import get_db_context
-from database.models import User, Patient, Visit, LabResult, ImagingResult, NFCCard
+from core.models import User, Patient, Visit, LabResult, ImagingResult, NFCCard
 
 
 def verify_migration():

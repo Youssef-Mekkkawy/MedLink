@@ -5,7 +5,7 @@ MySQL Version - Compatible with existing GUI
 
 from datetime import datetime, date
 from core.database import get_db
-from database.models import Visit, Prescription
+from core.models import Visit, Prescription
 
 class VisitManager:
     """Manage medical visits"""

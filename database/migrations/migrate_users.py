@@ -11,7 +11,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from database.connection import get_db_context
-from database.models import User
+from core.models import User
 
 
 def migrate_users(json_file_path: str = 'data/users.json'):

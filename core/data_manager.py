@@ -5,7 +5,7 @@ MySQL Version - Compatible with existing GUI
 
 from datetime import datetime, date
 from database.database_manager import *
-from database.models import *
+from core.models import *
 import json
 
 class DataManager:

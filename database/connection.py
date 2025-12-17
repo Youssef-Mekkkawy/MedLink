@@ -108,7 +108,7 @@ def init_database():
     Initialize database - create all tables
     Similar to Laravel's php artisan migrate
     """
-    from database.models import Base
+    from core.models import Base
     Base.metadata.create_all(bind=engine)
     print(f"✅ Database initialized successfully at: {DATABASE_URL}")
 
@@ -118,7 +118,7 @@ def drop_database():
     Drop all tables (use with caution!)
     Similar to Laravel's php artisan migrate:fresh
     """
-    from database.models import Base
+    from core.models import Base
     Base.metadata.drop_all(bind=engine)
     print("⚠️  All tables dropped!")
 

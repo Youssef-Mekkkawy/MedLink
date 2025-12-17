@@ -518,13 +518,15 @@ class NFCCard:
     def get_by_uid(db, card_uid):
         """Get card (doctor or patient) by UID"""
         # Try doctor card first
-        doctor_card = db.query(DoctorCard).filter_by(card_uid=card_uid).first()
-        if doctor_card:
-            return doctor_card
+        return db.query(NFCCard).filter(NFCCard.uid == card_uid).first()
+ 
+        # doctor_card = db.query(DoctorCard).filter_by(card_uid=card_uid).first()
+        # if doctor_card:
+        #     return doctor_card
         
-        # Try patient card
-        patient_card = db.query(PatientCard).filter_by(card_uid=card_uid).first()
-        return patient_card
+        # # Try patient card
+        # patient_card = db.query(PatientCard).filter_by(card_uid=card_uid).first()
+        # return patient_card
     
     @staticmethod
     def is_doctor_card(card):

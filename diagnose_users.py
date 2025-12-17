@@ -3,7 +3,7 @@ Database User Diagnostic Script
 Check what users exist and their credentials
 """
 import hashlib
-from database.models import User
+from core.models import User
 from database.connection import get_db_context
 import sys
 from pathlib import Path

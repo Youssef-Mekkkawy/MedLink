@@ -7,15 +7,15 @@ from core.database import (
     Base,
     get_db,
     get_db_context,
-    get_engine,
+    # get_engine,
     init_db,
     drop_db,
     test_connection,
     SessionLocal,
-    ScopedSession
+    # ScopedSession
 )
 
-from database.models import (
+from core.models import (
     # Main Models
     User,
     Patient,
@@ -75,6 +75,8 @@ __all__ = [
     'PatientCard',
     'NFCCard',
     'HardwareAuditLog',
+    'Disability',
+    'disabilities_special_needs',
     
     # Enums
     'UserRole',

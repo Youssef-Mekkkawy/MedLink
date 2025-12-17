@@ -4,7 +4,7 @@ Handles NFC card authentication and operations
 """
 
 from core.database import get_db
-from database.models import DoctorCard, PatientCard, User, Patient
+from core.models import DoctorCard, PatientCard, User, Patient
 from datetime import datetime
 
 

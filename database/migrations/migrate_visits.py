@@ -11,7 +11,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from database.connection import get_db_context
-from database.models import Visit
+from core.models import Visit
 
 
 def migrate_visits(json_file_path: str = 'data/visits.json'):
