@@ -242,7 +242,7 @@ class MedicalProfileTab(ctk.CTkFrame):
         for widget in self.surgery_frame.winfo_children():
             widget.destroy()
 
-        surgeries = surgery_manager.get_patient_surgeries(
+        surgeries = surgery_manager.get_recent_surgeries(
             self.patient_data.get('national_id')
         )
 

@@ -8,5 +8,6 @@ from database import schema
 from database.connection import get_db, engine, SessionLocal
 from config.database_config import DATABASE_CONFIG
 from core.models import Base
+from core.lab_manager import lab_manager
 
-__all__ = ['get_db', 'engine', 'SessionLocal', 'Base', 'DATABASE_CONFIG','setup_with_data', 'DataSeeder', 'schema']
+__all__ = ['get_db', 'engine', 'SessionLocal', 'Base', 'DATABASE_CONFIG','setup_with_data', 'DataSeeder', 'schema', 'lab_manager', 'visit_manager']

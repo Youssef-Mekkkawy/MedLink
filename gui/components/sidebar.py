@@ -1,6 +1,6 @@
 """
-Sidebar navigation component - MINIMAL FIX VERSION
-Only makes buttons work, keeps original design!
+Sidebar navigation component - FIXED VERSION
+Location: gui/components/sidebar.py
 """
 import customtkinter as ctk
 from tkinter import messagebox
@@ -17,194 +17,163 @@ class Sidebar(ctk.CTkFrame):
             corner_radius=0,
             width=260
         )
-        # DATABASE FIX: Convert SQLAlchemy objects to dict
-        if hasattr(patient_data, '__dict__') and not isinstance(patient_data, dict):
-            if hasattr(patient_data, 'to_dict'):
-                self.patient_data = patient_data.to_dict()
-            else:
-                # Manual conversion
-                self.patient_data = {}
-                for attr in ['national_id', 'full_name', 'age', 'gender', 'blood_type', 'phone', 'email']:
-                    value = getattr(patient_data, attr, None)
-                    if hasattr(value, 'value'):  # Enum
-                        self.patient_data[attr] = value.value
-                    else:
-                        self.patient_data[attr] = value
-                
-                # Handle relationships
-                if hasattr(patient_data, 'allergies'):
-                    self.patient_data['allergies'] = [a.allergen_name for a in patient_data.allergies]
-                if hasattr(patient_data, 'chronic_diseases'):
-                    self.patient_data['chronic_diseases'] = [cd.disease_name for cd in patient_data.chronic_diseases]
-                if hasattr(patient_data, 'current_medications'):
-                    self.patient_data['current_medications'] = [
-                        {'name': m.medication_name, 'dosage': m.dosage, 'frequency': m.frequency}
-                        for m in patient_data.current_medications if hasattr(m, 'is_active') and m.is_active
-                    ]
-        else:
-            self.patient_data = patient_data
-
         
-        self.user_data = user_data
+        # DATABASE FIX: Convert user_data (not patient_data!)
+        from gui.components.db_converter import convert_to_dict
+        self.user_data = convert_to_dict(user_data)
         self.on_logout = on_logout
         
         self.pack_propagate(False)
-        self.create_ui()
+        
+        self.create_header()
+        self.create_navigation()
+        self.create_footer()
     
-    def create_ui(self):
-        """Create sidebar content"""
-        # Header with logo
-        header_frame = ctk.CTkFrame(self, fg_color='transparent')
-        header_frame.pack(fill='x', padx=20, pady=(30, 20))
-        
-        logo_label = ctk.CTkLabel(
-            header_frame,
-            text="🏥",
-            font=('Segoe UI', 36)
-        )
-        logo_label.pack()
-        
-        app_name = ctk.CTkLabel(
-            header_frame,
-            text="MedLink",
-            font=('Segoe UI', 20, 'bold'),
-            text_color=COLORS['text_primary']
-        )
-        app_name.pack(pady=(5, 0))
-        
-        # Divider
-        ctk.CTkFrame(
+    def create_header(self):
+        """Create user info header"""
+        header = ctk.CTkFrame(
             self,
-            height=1,
-            fg_color=COLORS['bg_hover']
-        ).pack(fill='x', padx=20, pady=20)
-        
-        # User info card
-        user_card = ctk.CTkFrame(
-            self,
-            fg_color=COLORS['bg_light'],
-            corner_radius=RADIUS['md']
+            fg_color='transparent',
+            height=120
         )
-        user_card.pack(fill='x', padx=20, pady=(0, 30))
+        header.pack(fill='x', pady=(20, 30), padx=20)
+        header.pack_propagate(False)
         
-        user_content = ctk.CTkFrame(user_card, fg_color='transparent')
-        user_content.pack(fill='x', padx=15, pady=15)
+        # Profile icon
+        icon_frame = ctk.CTkFrame(
+            header,
+            fg_color=COLORS['primary'],
+            corner_radius=35,
+            width=70,
+            height=70
+        )
+        icon_frame.pack()
+        icon_frame.pack_propagate(False)
         
-        # User icon
-        icon = ctk.CTkLabel(
-            user_content,
-            text="👨‍⚕️",
+        icon_label = ctk.CTkLabel(
+            icon_frame,
+            text="👤",
             font=('Segoe UI', 32)
         )
-        icon.pack()
+        icon_label.place(relx=0.5, rely=0.5, anchor='center')
         
         # User name
+        name = self.user_data.get('full_name', 'User')
         name_label = ctk.CTkLabel(
-            user_content,
-            text=self.user_data.get('full_name', 'Doctor'),
-            font=FONTS['body_bold'],
+            header,
+            text=name,
+            font=FONTS['subheading'],
             text_color=COLORS['text_primary']
         )
-        name_label.pack(pady=(5, 0))
+        name_label.pack(pady=(10, 2))
         
-        # Specialization
-        spec_label = ctk.CTkLabel(
-            user_content,
-            text=self.user_data.get('specialization', 'General'),
+        # Role
+        role = self.user_data.get('role', 'User')
+        role_label = ctk.CTkLabel(
+            header,
+            text=role.title(),
             font=FONTS['small'],
             text_color=COLORS['text_secondary']
         )
-        spec_label.pack()
-        
-        # Navigation menu
-        nav_frame = ctk.CTkFrame(self, fg_color='transparent')
-        nav_frame.pack(fill='both', expand=True, padx=20)
-        
-        # Menu items with working commands
-        self.create_nav_button(
-            nav_frame, "🏠  Dashboard", active=True,
-            command=lambda: messagebox.showinfo(
-                "Dashboard", 
-                "You're already on the Dashboard!"
-            )
-        )
-        
-        self.create_nav_button(
-            nav_frame, "👥  All Patients",
-            command=lambda: messagebox.showinfo(
-                "All Patients",
-                "All Patients view coming soon!\n\n"
-                "This will show a list of all patients\n"
-                "in the system."
-            )
-        )
-        
-        self.create_nav_button(
-            nav_frame, "📅  Appointments",
-            command=lambda: messagebox.showinfo(
-                "Appointments",
-                "Appointment scheduling coming soon!\n\n"
-                "Features:\n"
-                "• Schedule appointments\n"
-                "• View calendar\n"
-                "• Send reminders"
-            )
-        )
-        
-        self.create_nav_button(
-            nav_frame, "📊  Statistics",
-            command=lambda: messagebox.showinfo(
-                "Statistics",
-                "Statistics dashboard coming soon!\n\n"
-                "Features:\n"
-                "• Patient statistics\n"
-                "• Visit trends\n"
-                "• Performance metrics"
-            )
-        )
-        
-        self.create_nav_button(
-            nav_frame, "⚙️  Settings",
-            command=lambda: messagebox.showinfo(
-                "Settings",
-                "Settings panel coming soon!\n\n"
-                "Features:\n"
-                "• Profile settings\n"
-                "• System preferences\n"
-                "• Security options"
-            )
-        )
-        
-        # Spacer
-        ctk.CTkFrame(nav_frame, fg_color='transparent', height=20).pack()
-        
-        # Logout button at bottom
-        logout_btn = ctk.CTkButton(
-            self,
-            text="🚪  Logout",
-            command=self.on_logout,
-            font=FONTS['body'],
-            height=45,
-            corner_radius=RADIUS['md'],
-            fg_color=COLORS['danger'],
-            hover_color='#b91c1c',
-            text_color=COLORS['text_primary']
-        )
-        logout_btn.pack(side='bottom', fill='x', padx=20, pady=20)
+        role_label.pack()
     
-    def create_nav_button(self, parent, text, active=False, command=None):
+    def create_navigation(self):
+        """Create navigation buttons"""
+        nav_frame = ctk.CTkFrame(self, fg_color='transparent')
+        nav_frame.pack(fill='both', expand=True, pady=(0, 20))
+        
+        # Navigation items based on role
+        role = self.user_data.get('role', 'user')
+        
+        if role.lower() == 'doctor':
+            nav_items = [
+                ("🏠", "Dashboard", self.show_dashboard),
+                ("👥", "Patients", self.show_patients),
+                ("📋", "My Schedule", self.show_schedule),
+                ("⚙️", "Settings", self.show_settings)
+            ]
+        elif role.lower() == 'patient':
+            nav_items = [
+                ("🏠", "Dashboard", self.show_dashboard),
+                ("📋", "My Records", self.show_records),
+                ("🗓️", "Appointments", self.show_appointments),
+                ("⚙️", "Settings", self.show_settings)
+            ]
+        else:
+            nav_items = [
+                ("🏠", "Dashboard", self.show_dashboard),
+                ("⚙️", "Settings", self.show_settings)
+            ]
+        
+        for icon, text, command in nav_items:
+            self.create_nav_button(nav_frame, icon, text, command)
+    
+    def create_nav_button(self, parent, icon, text, command):
         """Create a navigation button"""
         btn = ctk.CTkButton(
             parent,
-            text=text,
+            text=f"{icon}  {text}",
             command=command,
             font=FONTS['body'],
-            height=45,
-            corner_radius=RADIUS['md'],
-            fg_color=COLORS['primary'] if active else 'transparent',
-            hover_color=COLORS['bg_hover'],
+            fg_color='transparent',
+            hover_color=COLORS['bg_light'],
             anchor='w',
-            text_color=COLORS['text_primary']
+            height=45
         )
-        btn.pack(fill='x', pady=(0, 8))
-        return btn
+        btn.pack(fill='x', padx=15, pady=2)
+    
+    def create_footer(self):
+        """Create footer with logout"""
+        footer = ctk.CTkFrame(
+            self,
+            fg_color='transparent',
+            height=80
+        )
+        footer.pack(fill='x', side='bottom', pady=20, padx=20)
+        footer.pack_propagate(False)
+        
+        # Logout button
+        logout_btn = ctk.CTkButton(
+            footer,
+            text="🚪 Logout",
+            command=self.handle_logout,
+            font=FONTS['body_bold'],
+            fg_color=COLORS['danger'],
+            hover_color='#991b1b',
+            height=45
+        )
+        logout_btn.pack(fill='x')
+    
+    def show_dashboard(self):
+        """Show dashboard"""
+        messagebox.showinfo("Navigation", "Dashboard")
+    
+    def show_patients(self):
+        """Show patients list"""
+        messagebox.showinfo("Navigation", "Patients List")
+    
+    def show_schedule(self):
+        """Show schedule"""
+        messagebox.showinfo("Navigation", "My Schedule")
+    
+    def show_records(self):
+        """Show medical records"""
+        messagebox.showinfo("Navigation", "My Medical Records")
+    
+    def show_appointments(self):
+        """Show appointments"""
+        messagebox.showinfo("Navigation", "My Appointments")
+    
+    def show_settings(self):
+        """Show settings"""
+        messagebox.showinfo("Navigation", "Settings")
+    
+    def handle_logout(self):
+        """Handle logout"""
+        result = messagebox.askyesno(
+            "Logout",
+            "Are you sure you want to logout?",
+            parent=self
+        )
+        if result and self.on_logout:
+            self.on_logout()
