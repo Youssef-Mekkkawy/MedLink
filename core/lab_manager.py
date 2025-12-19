@@ -1,124 +1,119 @@
 """
-Visit Manager - Manage Medical Visits
-MySQL Version - Compatible with existing GUI
+Lab Manager - Database Operations for Lab Results
+Handles all lab result database operations
+
+Location: core/lab_manager.py
 """
 
-from datetime import datetime, date
 from core.database import get_db
-from core.models import Visit, Prescription
+from core.models import LabResult
+from sqlalchemy import desc
+from typing import List, Dict, Optional
+from datetime import datetime, date
 
-class VisitManager:
-    """Manage medical visits"""
+
+class LabManager:
+    """Manage lab result records"""
     
     def __init__(self):
         pass
     
-    def create_visit(self, visit_data, prescriptions=None):
-        """
-        Create new visit
-        visit_data: dict with visit information
-        prescriptions: list of prescription dicts
-        """
+    def add_lab_result(self, lab_data: dict) -> LabResult:
+        """Add new lab result"""
         with get_db() as db:
-            visit = Visit(**visit_data)
-            db.add(visit)
-            db.flush()  # Get visit ID
+            lab = LabResult(**lab_data)
+            db.add(lab)
+            db.commit()
+            db.refresh(lab)
+            return lab
+    
+    def get_patient_lab_results(self, national_id: str, limit: int = 50) -> List[Dict]:
+        """Get all lab results for a patient"""
+        with get_db() as db:
+            results = db.query(LabResult).filter(
+                LabResult.patient_national_id == national_id
+            ).order_by(desc(LabResult.test_date)).limit(limit).all()
             
-            # Add prescriptions
-            if prescriptions:
-                for presc_data in prescriptions:
-                    presc = Prescription(
-                        visit_id=visit.visit_id,
-                        patient_national_id=visit.patient_national_id,
-                        **presc_data
-                    )
-                    db.add(presc)
+            return [self._lab_to_dict(r) for r in results]
+    
+    def get_recent_lab_results(self, national_id: str, limit: int = 10) -> List[Dict]:
+        """Get recent lab results for a patient"""
+        with get_db() as db:
+            results = db.query(LabResult).filter(
+                LabResult.patient_national_id == national_id
+            ).order_by(desc(LabResult.test_date)).limit(limit).all()
+            
+            return [self._lab_to_dict(r) for r in results]
+    
+    def get_lab_by_id(self, lab_id: int) -> Optional[Dict]:
+        """Get lab result by ID"""
+        with get_db() as db:
+            lab = db.query(LabResult).filter(
+                LabResult.lab_result_id == lab_id
+            ).first()
+            
+            return self._lab_to_dict(lab) if lab else None
+    
+    def get_labs_by_type(self, national_id: str, test_name: str) -> List[Dict]:
+        """Get lab results by test type"""
+        with get_db() as db:
+            results = db.query(LabResult).filter(
+                LabResult.patient_national_id == national_id,
+                LabResult.test_name.contains(test_name)
+            ).order_by(desc(LabResult.test_date)).all()
+            
+            return [self._lab_to_dict(r) for r in results]
+    
+    def update_lab_result(self, lab_id: int, updates: dict) -> bool:
+        """Update lab result"""
+        with get_db() as db:
+            lab = db.query(LabResult).filter(
+                LabResult.lab_result_id == lab_id
+            ).first()
+            
+            if not lab:
+                return False
+            
+            for key, value in updates.items():
+                if hasattr(lab, key):
+                    setattr(lab, key, value)
             
             db.commit()
-            db.refresh(visit)
-            return visit
+            return True
     
-    def get_visit(self, visit_id):
-        """Get visit by ID"""
+    def delete_lab_result(self, lab_id: int) -> bool:
+        """Delete lab result"""
         with get_db() as db:
-            return db.query(Visit).filter(Visit.visit_id == visit_id).first()
-    
-    def get_patient_visits(self, national_id, limit=None):
-        """Get all visits for a patient"""
-        with get_db() as db:
-            query = db.query(Visit).filter(
-                Visit.patient_national_id == national_id
-            ).order_by(Visit.date.desc(), Visit.time.desc())
+            lab = db.query(LabResult).filter(
+                LabResult.lab_result_id == lab_id
+            ).first()
             
-            if limit:
-                query = query.limit(limit)
+            if not lab:
+                return False
             
-            return query.all()
-    
-    def get_doctor_visits(self, doctor_id, limit=None):
-        """Get all visits by a doctor"""
-        with get_db() as db:
-            query = db.query(Visit).filter(
-                Visit.doctor_id == doctor_id
-            ).order_by(Visit.date.desc())
-            
-            if limit:
-                query = query.limit(limit)
-            
-            return query.all()
-    
-    def update_visit(self, visit_id, update_data):
-        """Update visit information"""
-        with get_db() as db:
-            visit = db.query(Visit).filter(Visit.visit_id == visit_id).first()
-            
-            if visit:
-                for key, value in update_data.items():
-                    if hasattr(visit, key):
-                        setattr(visit, key, value)
-                
-                db.commit()
-                db.refresh(visit)
-                return visit
-            
-            return None
-    
-    def delete_visit(self, visit_id):
-        """Delete visit"""
-        with get_db() as db:
-            visit = db.query(Visit).filter(Visit.visit_id == visit_id).first()
-            
-            if visit:
-                db.delete(visit)
-                db.commit()
-                return True
-            
-            return False
-    
-    def get_recent_visits(self, limit=10):
-        """Get most recent visits across all patients"""
-        with get_db() as db:
-            return db.query(Visit).order_by(
-                Visit.date.desc(), Visit.time.desc()
-            ).limit(limit).all()
-    
-    def add_prescription(self, visit_id, prescription_data):
-        """Add prescription to existing visit"""
-        with get_db() as db:
-            visit = db.query(Visit).filter(Visit.visit_id == visit_id).first()
-            
-            if not visit:
-                return {'success': False, 'message': 'Visit not found'}
-            
-            presc = Prescription(
-                visit_id=visit_id,
-                patient_national_id=visit.patient_national_id,
-                **prescription_data
-            )
-            db.add(presc)
+            db.delete(lab)
             db.commit()
-            
-            return {'success': True, 'prescription': presc}
+            return True
+    
+    def _lab_to_dict(self, lab: LabResult) -> Dict:
+        """Convert LabResult to dictionary"""
+        return {
+            'lab_result_id': lab.lab_result_id if hasattr(lab, 'lab_result_id') else None,
+            'patient_national_id': lab.patient_national_id if hasattr(lab, 'patient_national_id') else None,
+            'test_name': lab.test_name if hasattr(lab, 'test_name') else 'Unknown',
+            'test_date': lab.test_date if hasattr(lab, 'test_date') else None,
+            'date': lab.test_date if hasattr(lab, 'test_date') else None,  # Alias
+            'result_value': lab.result_value if hasattr(lab, 'result_value') else None,
+            'unit': lab.unit if hasattr(lab, 'unit') else None,
+            'reference_range': lab.reference_range if hasattr(lab, 'reference_range') else None,
+            'status': lab.status if hasattr(lab, 'status') else None,
+            'lab_name': lab.lab_name if hasattr(lab, 'lab_name') else None,
+            'ordered_by': lab.ordered_by if hasattr(lab, 'ordered_by') else None,
+            'notes': lab.notes if hasattr(lab, 'notes') else None,
+            'is_abnormal': lab.is_abnormal if hasattr(lab, 'is_abnormal') else False,
+            'created_at': lab.created_at if hasattr(lab, 'created_at') else None
+        }
+
 
 # Global instance
-visit_manager = VisitManager()
+lab_manager = LabManager()

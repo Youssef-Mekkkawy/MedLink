@@ -10,46 +10,26 @@ from datetime import datetime
 
 
 class EnhancedLabResultsManager(ctk.CTkFrame):
-    def __init__(self, parent, patient_id, is_doctor, on_add=None, on_view=None):
+    def __init__(self, parent, patient_data, is_doctor=False, on_add=None, on_view=None):
         """
         Initialize lab results manager
         
         Args:
             parent: Parent widget
-            patient_id: Patient's National ID
+            patient_data: Patient dict or object (NOT just ID!)
+            is_doctor: Whether viewing as doctor (shows Add button)
             on_add: Optional callback for adding new results
             on_view: Optional callback for viewing detailed results
         """
         super().__init__(parent, fg_color='transparent')
-        # DATABASE FIX: Convert SQLAlchemy objects to dict
-        if hasattr(patient_data, '__dict__') and not isinstance(patient_data, dict):
-            if hasattr(patient_data, 'to_dict'):
-                self.patient_data = patient_data.to_dict()
-            else:
-                # Manual conversion
-                self.patient_data = {}
-                for attr in ['national_id', 'full_name', 'age', 'gender', 'blood_type', 'phone', 'email']:
-                    value = getattr(patient_data, attr, None)
-                    if hasattr(value, 'value'):  # Enum
-                        self.patient_data[attr] = value.value
-                    else:
-                        self.patient_data[attr] = value
-                
-                # Handle relationships
-                if hasattr(patient_data, 'allergies'):
-                    self.patient_data['allergies'] = [a.allergen_name for a in patient_data.allergies]
-                if hasattr(patient_data, 'chronic_diseases'):
-                    self.patient_data['chronic_diseases'] = [cd.disease_name for cd in patient_data.chronic_diseases]
-                if hasattr(patient_data, 'current_medications'):
-                    self.patient_data['current_medications'] = [
-                        {'name': m.medication_name, 'dosage': m.dosage, 'frequency': m.frequency}
-                        for m in patient_data.current_medications if hasattr(m, 'is_active') and m.is_active
-                    ]
-        else:
-            self.patient_data = patient_data
-
         
-        self.patient_id = patient_id
+        # DATABASE FIX: Convert and assign
+        from gui.components.db_converter import convert_to_dict
+        self.patient_data = convert_to_dict(patient_data)
+        
+        # Extract patient ID
+        self.patient_id = self.patient_data.get('national_id')
+        self.is_doctor = is_doctor
         self.on_add = on_add
         self.on_view = on_view
         self.all_results = []
@@ -72,12 +52,12 @@ class EnhancedLabResultsManager(ctk.CTkFrame):
         )
         title.pack(side='left')
         
-        # Add button (if callback provided)
-        if self.on_add:
+        # Add button (if doctor or callback provided)
+        if self.is_doctor or self.on_add:
             add_btn = ctk.CTkButton(
                 header,
                 text="➕ Add Result",
-                command=self.on_add,
+                command=self.on_add if self.on_add else self.show_add_dialog,
                 font=FONTS['body_bold'],
                 fg_color=COLORS['primary'],
                 hover_color=COLORS['primary_hover'],
@@ -154,8 +134,6 @@ class EnhancedLabResultsManager(ctk.CTkFrame):
     def load_results(self):
         """Load lab results for patient"""
         try:
-            # lab_manager = LabManager()
-            # FIXED: Changed from get_patient_lab_results to get_patient_lab_results
             self.all_results = lab_manager.get_patient_lab_results(self.patient_id)
             self.filter_results()
         except Exception as e:
@@ -232,8 +210,8 @@ class EnhancedLabResultsManager(ctk.CTkFrame):
         )
         test_name.pack(anchor='w')
         
-        # Date and category
-        meta_text = f"📅 {self.format_date(result.get('test_date', 'N/A'))} • {result.get('test_category', 'Other')}"
+        # Date
+        meta_text = f"📅 {self.format_date(result.get('test_date', 'N/A'))}"
         meta_label = ctk.CTkLabel(
             name_frame,
             text=meta_text,
@@ -259,51 +237,45 @@ class EnhancedLabResultsManager(ctk.CTkFrame):
         )
         status_badge.pack(side='right', padx=(10, 0))
         
-        # Results summary
-        if result.get('results_summary'):
-            summary_label = ctk.CTkLabel(
+        # Result value
+        if result.get('result_value'):
+            value_text = f"Result: {result['result_value']}"
+            if result.get('unit'):
+                value_text += f" {result['unit']}"
+            
+            # Color based on abnormal
+            value_color = COLORS['error'] if result.get('is_abnormal') else COLORS['success']
+            
+            value_label = ctk.CTkLabel(
                 content,
-                text=result['results_summary'][:100] + "..." if len(result.get('results_summary', '')) > 100 else result.get('results_summary', ''),
+                text=value_text,
                 font=FONTS['body'],
+                text_color=value_color,
+                anchor='w'
+            )
+            value_label.pack(anchor='w', pady=(10, 0))
+            
+            # Reference range
+            if result.get('reference_range'):
+                range_label = ctk.CTkLabel(
+                    content,
+                    text=f"Reference: {result['reference_range']}",
+                    font=FONTS['small'],
+                    text_color=COLORS['text_secondary'],
+                    anchor='w'
+                )
+                range_label.pack(anchor='w', pady=(3, 0))
+        
+        # Lab name
+        if result.get('lab_name'):
+            lab_label = ctk.CTkLabel(
+                content,
+                text=f"🏥 {result['lab_name']}",
+                font=FONTS['small'],
                 text_color=COLORS['text_secondary'],
-                anchor='w',
-                justify='left'
+                anchor='w'
             )
-            summary_label.pack(fill='x', pady=(10, 0))
-        
-        # Action buttons
-        btn_frame = ctk.CTkFrame(content, fg_color='transparent')
-        btn_frame.pack(fill='x', pady=(10, 0))
-        
-        # View button
-        if self.on_view:
-            view_btn = ctk.CTkButton(
-                btn_frame,
-                text="👁️ View Details",
-                command=lambda r=result: self.on_view(r),
-                font=FONTS['body'],
-                fg_color=COLORS['primary'],
-                hover_color=COLORS['primary_hover'],
-                height=30,
-                width=120,
-                corner_radius=RADIUS['md']
-            )
-            view_btn.pack(side='left', padx=(0, 10))
-        
-        # Download button (if file exists)
-        if result.get('file_path'):
-            download_btn = ctk.CTkButton(
-                btn_frame,
-                text="📥 Download",
-                command=lambda: self.download_result(result),
-                font=FONTS['body'],
-                fg_color=COLORS['bg_light'],
-                hover_color=COLORS['border_light'],
-                height=30,
-                width=120,
-                corner_radius=RADIUS['md']
-            )
-            download_btn.pack(side='left')
+            lab_label.pack(anchor='w', pady=(5, 0))
     
     def show_no_results(self, message="No lab results available"):
         """Show no results message"""
@@ -327,33 +299,21 @@ class EnhancedLabResultsManager(ctk.CTkFrame):
     def format_date(self, date_str):
         """Format date string for display"""
         try:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            return date_obj.strftime('%B %d, %Y')
+            if isinstance(date_str, str):
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                return date_obj.strftime('%B %d, %Y')
+            return str(date_str)
         except:
-            return date_str
+            return str(date_str)
     
-    def download_result(self, result):
-        """Download result file"""
-        try:
-            import shutil
-            from tkinter import filedialog
-            
-            source = result.get('file_path')
-            if not source:
-                return
-            
-            # Ask user where to save
-            dest = filedialog.asksaveasfilename(
-                defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
-                initialfile=f"{result.get('test_name', 'lab_result')}.pdf"
-            )
-            
-            if dest:
-                shutil.copy2(source, dest)
-                print(f"✅ Downloaded: {dest}")
-        except Exception as e:
-            print(f"Error downloading result: {e}")
+    def show_add_dialog(self):
+        """Show dialog to add lab result"""
+        from tkinter import messagebox
+        messagebox.showinfo(
+            "Add Lab Result",
+            "Add Lab Result dialog coming soon!\n\n"
+            "This will allow doctors to add new lab results."
+        )
     
     def refresh(self):
         """Refresh results list"""
