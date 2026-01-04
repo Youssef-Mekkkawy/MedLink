@@ -8,48 +8,48 @@ from core.models import User, Patient, Surgery, Hospitalization, Vaccination, Cu
 from datetime import datetime
 
 
-# def safe_get_patient_attr(patient, attr_name, default=None):
-#     """
-#     Safely get patient attribute with fallback
-#     Handles both missing attributes and Phase 8-13 field mappings
-#     """
-#     # Attribute mappings for Phase 8-13
-#     attr_mapping = {
-#         'disabilities_special_needs': 'disabilities',  # Use disabilities relationship
-#     }
+def safe_get_patient_attr(patient, attr_name, default=None):
+    """
+    Safely get patient attribute with fallback
+    Handles both missing attributes and Phase 8-13 field mappings
+    """
+    # Attribute mappings for Phase 8-13
+    attr_mapping = {
+        'disabilities_special_needs': 'disabilities',  # Use disabilities relationship
+    }
     
-#     # Check if attribute is mapped to a different name
-#     if attr_name in attr_mapping:
-#         actual_attr = attr_mapping[attr_name]
-#         if actual_attr and hasattr(patient, actual_attr):
-#             value = getattr(patient, actual_attr)
-#             # Convert relationship to list of dicts
-#             if hasattr(value, '__iter__') and not isinstance(value, (str, dict)):
-#                 try:
-#                     return [item.to_dict() if hasattr(item, 'to_dict') else str(item) for item in value]
-#                 except:
-#                     return list(value) if value else []
-#             return value
-#         return default
+    # Check if attribute is mapped to a different name
+    if attr_name in attr_mapping:
+        actual_attr = attr_mapping[attr_name]
+        if actual_attr and hasattr(patient, actual_attr):
+            value = getattr(patient, actual_attr)
+            # Convert relationship to list of dicts
+            if hasattr(value, '__iter__') and not isinstance(value, (str, dict)):
+                try:
+                    return [item.to_dict() if hasattr(item, 'to_dict') else str(item) for item in value]
+                except:
+                    return list(value) if value else []
+            return value
+        return default
     
-#     # Try to get the attribute normally
-#     if hasattr(patient, attr_name):
-#         value = getattr(patient, attr_name)
+    # Try to get the attribute normally
+    if hasattr(patient, attr_name):
+        value = getattr(patient, attr_name)
         
-#         # Handle SQLAlchemy relationships (convert to list)
-#         if hasattr(value, '__iter__') and not isinstance(value, (str, dict)):
-#             try:
-#                 return [item.to_dict() if hasattr(item, 'to_dict') else str(item) for item in value]
-#             except:
-#                 return list(value) if value else []
+        # Handle SQLAlchemy relationships (convert to list)
+        if hasattr(value, '__iter__') and not isinstance(value, (str, dict)):
+            try:
+                return [item.to_dict() if hasattr(item, 'to_dict') else str(item) for item in value]
+            except:
+                return list(value) if value else []
         
-#         # Handle enums
-#         if hasattr(value, 'value'):
-#             return value.value
+        # Handle enums
+        if hasattr(value, 'value'):
+            return value.value
         
-#         return value
+        return value
     
-#     return default
+    return default
 
 
 class PatientManager:
@@ -74,8 +74,8 @@ class PatientManager:
             if not patient:
                 return None
             # Convert to dict while in session (CRITICAL!)
-            # data = self._patient_to_dict(patient)
-            return
+            # data = 
+            return self._patient_to_dict(patient)
         finally:
             db.close()
     
