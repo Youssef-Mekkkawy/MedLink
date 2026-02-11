@@ -8,8 +8,8 @@ from core.patient_manager import PatientManager
 from core.doctor_manager import DoctorManager
 from core.medical_managers import visit_manager,lab_manager,imaging_manager,nfc_manager,audit_manager
 from core.lab_manager import LabResult
-from core.imaging_result import ImagingResult
-from core.prescription import Prescription
+from core.imaging_manager import ImagingResult
+# from core.pres import Prescription
 from datetime import datetime, timedelta
 import json
 import random
