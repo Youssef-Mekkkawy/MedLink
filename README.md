@@ -107,6 +107,14 @@ The core idea: **Every medical entity connected together**: Hospitals - Clinics 
 
 ---
 
+## 🚀 Key Technical Highlights & Engineering Challenges
+
+* **Robust Database Architecture & System Design:** Designed and structured a highly relational database architecture capable of seamlessly linking disparate healthcare entities—including hospitals, outpatient clinics, laboratories, and radiology centers—to maintain a unified, immutable, and lifetime medical history for patients from birth.
+* **Advanced Role-Based Access Control (RBAC):** Developed a secure, granular RBAC system to drive distinct, real-time workflows for Doctor and Patient dashboards. Implemented complex backend business logic to ensure that whenever a doctor updates a prescription or diagnostic report, the changes dynamically reflect across the system instantly and securely.
+* **Agile Team Collaboration & Git Workflow:** Effectively coordinated within a development group using GitHub for version control. Successfully managed repository permissions, branch strategies, and code reviews, ensuring smooth feature integration and maintaining high code quality without merge conflicts.
+
+---
+
 ## 🌟 Key Features
 
 ### 🔐 **Secure Multi-User Authentication**
